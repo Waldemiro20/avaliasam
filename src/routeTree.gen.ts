@@ -10,33 +10,79 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminLoginRouteImport } from './routes/admin/login'
+import { Route as AvaliarIndexRouteImport } from './routes/avaliar/index'
+import { Route as AvaliarVotacaoRouteImport } from './routes/avaliar/votacao'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/admin/',
+  path: '/admin/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminLoginRoute = AdminLoginRouteImport.update({
+  id: '/admin/login',
+  path: '/admin/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AvaliarIndexRoute = AvaliarIndexRouteImport.update({
+  id: '/avaliar/',
+  path: '/avaliar/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AvaliarVotacaoRoute = AvaliarVotacaoRouteImport.update({
+  id: '/avaliar/votacao',
+  path: '/avaliar/votacao',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/avaliar/votacao': typeof AvaliarVotacaoRoute
+  '/admin/': typeof AdminIndexRoute
+  '/avaliar/': typeof AvaliarIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/avaliar/votacao': typeof AvaliarVotacaoRoute
+  '/admin': typeof AdminIndexRoute
+  '/avaliar': typeof AvaliarIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin/login': typeof AdminLoginRoute
+  '/avaliar/votacao': typeof AvaliarVotacaoRoute
+  '/admin/': typeof AdminIndexRoute
+  '/avaliar/': typeof AvaliarIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/admin/login' | '/avaliar/votacao' | '/admin/' | '/avaliar/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/admin/login' | '/avaliar/votacao' | '/admin' | '/avaliar'
+  id:
+    | '__root__'
+    | '/'
+    | '/admin/login'
+    | '/avaliar/votacao'
+    | '/admin/'
+    | '/avaliar/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminLoginRoute: typeof AdminLoginRoute
+  AvaliarVotacaoRoute: typeof AvaliarVotacaoRoute
+  AdminIndexRoute: typeof AdminIndexRoute
+  AvaliarIndexRoute: typeof AvaliarIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +94,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/admin'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/login': {
+      id: '/admin/login'
+      path: '/admin/login'
+      fullPath: '/admin/login'
+      preLoaderRoute: typeof AdminLoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/avaliar/': {
+      id: '/avaliar/'
+      path: '/avaliar'
+      fullPath: '/avaliar/'
+      preLoaderRoute: typeof AvaliarIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/avaliar/votacao': {
+      id: '/avaliar/votacao'
+      path: '/avaliar/votacao'
+      fullPath: '/avaliar/votacao'
+      preLoaderRoute: typeof AvaliarVotacaoRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminLoginRoute: AdminLoginRoute,
+  AvaliarVotacaoRoute: AvaliarVotacaoRoute,
+  AdminIndexRoute: AdminIndexRoute,
+  AvaliarIndexRoute: AvaliarIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
