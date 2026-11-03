@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { store } from "@/lib/store";
 
@@ -26,7 +26,7 @@ function Welcome() {
     nav({ to: "/avaliar/votacao" });
   };
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen flex-col items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-md space-y-6 rounded-xl border bg-card p-8 text-center shadow-soft">
         <div className="flex justify-center"><Logo size="lg" /></div>
         <span className="bg-accent-grad inline-block rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider text-accent-foreground">Avaliador VIP</span>
@@ -36,6 +36,9 @@ function Welcome() {
           Entrar na Sala de Avaliação <ArrowRight className="h-4 w-4" />
         </button>
       </form>
+      <button onClick={() => nav({ to: "/" })} className="mt-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Voltar
+      </button>
     </main>
   );
 }
