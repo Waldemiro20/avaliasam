@@ -1,0 +1,5 @@
+# Roadmap
+
+- [x] Botão "Sair" no cabeçalho da página de votação dos jurados
+- [ ] Botão "Voltar" na página inicial do avaliador (/avaliar) para quem entrou por engano
+- [ ] Testar fluxo: entrar como jurado, sair, voltar
