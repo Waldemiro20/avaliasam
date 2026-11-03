@@ -26,7 +26,7 @@ function Welcome() {
     nav({ to: "/avaliar/votacao" });
   };
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
+    <main className="flex min-h-screen flex-col items-center justify-center px-4">
       <form onSubmit={submit} className="w-full max-w-md space-y-6 rounded-xl border bg-card p-8 text-center shadow-soft">
         <div className="flex justify-center"><Logo size="lg" /></div>
         <span className="bg-accent-grad inline-block rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider text-accent-foreground">Avaliador VIP</span>
