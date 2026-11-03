@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Send, Users } from "lucide-react";
+import { CheckCircle2, LogOut, Send, Users } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { clampAmount, formatBRL, MAX_PER_PROJECT, store, useStore } from "@/lib/store";
 
@@ -42,7 +42,10 @@ function Voting() {
       <header className="sticky top-0 z-10 border-b bg-card/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Logo />
-          <p className="text-sm">Bem-vindo(a), <strong className="text-primary">{evaluator}</strong></p>
+          <div className="flex items-center gap-4">
+            <p className="text-sm">Bem-vindo(a), <strong className="text-primary">{evaluator}</strong></p>
+            <button onClick={() => { store.setEvaluator(""); nav({ to: "/avaliar", replace: true }); }} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive"><LogOut className="h-4 w-4" /> Sair</button>
+          </div>
         </div>
       </header>
       <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 pb-32">
