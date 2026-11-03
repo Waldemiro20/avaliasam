@@ -155,10 +155,10 @@ function EventManagement() {
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
             <div>
               <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-orange-600 dark:text-[#f97316]"><CalendarDays className="h-4 w-4" /> Administração</p>
-              <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">Gerenciamento de Eventos</h1>
+              <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">Gerenciamento de Eventos</h1>
               <p className="mt-2 text-muted-foreground">Crie eventos, acompanhe os prazos e gerencie suas avaliações.</p>
             </div>
-            <button onClick={openNewEvent} className="bg-brand flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold text-primary-foreground shadow-soft">
+            <button onClick={openNewEvent} className="bg-brand flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-semibold text-primary-foreground shadow-soft sm:w-auto">
               <Plus className="h-4 w-4" /> Novo Evento
             </button>
           </div>

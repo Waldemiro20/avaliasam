@@ -123,15 +123,15 @@ function Voting() {
           {projects.map((p) => {
             const v = amounts[p.id] ?? 0;
             return (
-              <article key={p.id} className="space-y-4 rounded-xl border bg-card p-6 shadow-soft">
+              <article key={p.id} className="space-y-4 rounded-xl border bg-card p-4 shadow-soft sm:p-6">
                 <div>
                   <h2 className="font-display text-xl font-bold">{p.name}</h2>
                   <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><Users className="h-4 w-4" /> {p.members}</p>
                   <p className="mt-3 text-sm">{p.description}</p>
                 </div>
-                <div className="flex items-baseline justify-between">
-                  <span className="font-display text-2xl font-bold text-primary">{formatBRL(v)}</span>
-                  <span className="text-xs text-muted-foreground">{investmentLimit > 0 ? Math.round((v / investmentLimit) * 100) : 0}%</span>
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-display text-xl font-bold text-primary sm:text-2xl">{formatBRL(v)}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{investmentLimit > 0 ? Math.round((v / investmentLimit) * 100) : 0}%</span>
                 </div>
                 <input disabled={!canVote} type="range" min={0} max={investmentLimit} step={1000} value={v} onChange={(e) => set(p.id, +e.target.value)} className="w-full accent-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50" aria-label={`Investimento em ${p.name}`} />
                 <div className="flex flex-wrap gap-2">
@@ -149,7 +149,7 @@ function Voting() {
       </main>
       {projects.length > 0 && event && canVote && (
         <div className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl justify-end px-4 py-3">
+          <div className="mx-auto flex max-w-6xl justify-end px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
             <button onClick={saveVotes} className="bg-brand flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold text-primary-foreground shadow-soft sm:w-auto">
               <Send className="h-4 w-4" /> Salvar / Enviar Avaliações
             </button>

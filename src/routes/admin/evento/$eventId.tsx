@@ -126,10 +126,10 @@ function Admin() {
   return (
     <div className={`${darkMode ? "dark" : ""} min-h-screen bg-background text-foreground`}>
       <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3">
           <Logo />
-          <div className="flex items-center gap-3">
-            <button type="button" onClick={() => nav({ to: "/admin" })} className="rounded-lg border px-3 py-2 text-sm font-medium text-muted-foreground transition hover:text-foreground">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
+            <button type="button" onClick={() => nav({ to: "/admin" })} className="rounded-lg border px-2.5 py-2 text-xs font-medium text-muted-foreground transition hover:text-foreground sm:px-3 sm:text-sm">
               Voltar aos eventos
             </button>
             <button type="button" onClick={() => setDarkMode((enabled) => !enabled)} aria-label={darkMode ? "Ativar tema claro" : "Ativar tema escuro"} aria-pressed={darkMode} className="grid h-9 w-9 place-items-center rounded-lg border text-muted-foreground transition hover:text-foreground">
@@ -145,7 +145,7 @@ function Admin() {
       <main className="mx-auto max-w-6xl space-y-7 px-4 py-8">
           <section className="rounded-2xl border bg-card p-5 shadow-soft sm:p-6">
             <p className="text-sm font-semibold uppercase tracking-wider text-orange-600 dark:text-[#f97316]">Evento</p>
-            <h1 className="mt-1 font-display text-3xl font-bold">{selectedEvent.name}</h1>
+            <h1 className="mt-1 break-words font-display text-2xl font-bold sm:text-3xl">{selectedEvent.name}</h1>
             {selectedEvent.description && <p className="mt-2 text-muted-foreground">{selectedEvent.description}</p>}
             <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold ${
               getEventStatus(selectedEvent) === "active" ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
@@ -204,14 +204,14 @@ function Admin() {
             </section>
 
             <section className="rounded-xl border bg-card p-5 shadow-soft sm:p-6">
-              <h2 className="mb-4 flex items-center gap-2 font-display text-xl font-bold"><Trophy className="h-5 w-5 text-orange-500" /> Ranking Geral · {selectedEvent.name}</h2>
+              <h2 className="mb-4 flex items-start gap-2 font-display text-lg font-bold sm:text-xl"><Trophy className="mt-1 h-5 w-5 shrink-0 text-orange-500" /> <span className="break-words">Ranking Geral · {selectedEvent.name}</span></h2>
               {ranking.length === 0 ? <p className="text-muted-foreground">Cadastre projetos para ver o ranking deste evento.</p> : (
                 <ol className="space-y-5">
                   {ranking.map((result, index) => (
                     <li key={result.project.id} className="space-y-2">
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="font-semibold"><span className={`mr-2 inline-grid h-7 w-7 place-items-center rounded-full text-sm ${index === 0 ? "bg-accent-grad text-accent-foreground" : "bg-secondary text-secondary-foreground"}`}>{index + 1}</span>{result.project.name}</span>
-                        <span className="font-display font-bold text-primary">{formatBRL(result.total)}</span>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span className="min-w-0 break-words font-semibold"><span className={`mr-2 inline-grid h-7 w-7 place-items-center rounded-full text-sm ${index === 0 ? "bg-accent-grad text-accent-foreground" : "bg-secondary text-secondary-foreground"}`}>{index + 1}</span>{result.project.name}</span>
+                        <span className="shrink-0 font-display font-bold text-primary">{formatBRL(result.total)}</span>
                       </div>
                       <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="bg-brand h-full rounded-full transition-all" style={{ width: `${(result.total / highestTotal) * 100}%` }} /></div>
                       {result.breakdown.length > 0 && (
