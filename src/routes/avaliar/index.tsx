@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Logo } from "@/components/Logo";
 import { store } from "@/lib/store";
 
@@ -36,6 +36,9 @@ function Welcome() {
           Entrar na Sala de Avaliação <ArrowRight className="h-4 w-4" />
         </button>
       </form>
+      <button onClick={() => nav({ to: "/" })} className="mt-4 flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+        <ArrowLeft className="h-4 w-4" /> Voltar
+      </button>
     </main>
   );
 }
