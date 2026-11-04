@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AdminLoginScreen } from "@/components/AdminLoginScreen";
+import { redirectIfAdmin } from "@/lib/route-guards";
 
 export const Route = createFileRoute("/admin/login")({
   head: () => ({
@@ -8,5 +9,6 @@ export const Route = createFileRoute("/admin/login")({
       { name: "description", content: "Acesse o painel administrativo do AvaliaSAM." },
     ],
   }),
+  beforeLoad: redirectIfAdmin,
   component: AdminLoginScreen,
 });

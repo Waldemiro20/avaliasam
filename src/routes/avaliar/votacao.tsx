@@ -1,9 +1,16 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CheckCircle2, LogOut, Moon, Send, Sun, Users } from "lucide-react";
 import { toast } from "sonner";
+import { evaluatorLogout, getVotingContext, submitVotes } from "@/api/evaluator";
+import { AuthLayout } from "@/components/AuthLayout";
+import { RevokedLinkNotice } from "@/components/EvaluatorAccess";
 import { Logo } from "@/components/Logo";
-import { clampAmount, formatBRL, getEventStatus, MAX_PER_PROJECT, store, useStore } from "@/lib/store";
+import { ProjectLinks } from "@/components/ProjectLinks";
+import { useDarkMode } from "@/hooks/use-dark-mode";
+import { ERR, errorMessage } from "@/lib/api-errors";
+import { clampAmount, formatBRL } from "@/lib/investment";
 
 export const Route = createFileRoute("/avaliar/votacao")({
   head: () => ({
@@ -18,57 +25,78 @@ export const Route = createFileRoute("/avaliar/votacao")({
 });
 
 const QUICK = [10_000, 20_000, 50_000];
+const compactBRL = (n: number) =>
+  new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 
 function Voting() {
   const nav = useNavigate();
-  const { ready, events, votes, evaluator, evaluatorToken, evaluatorEventId, evaluators } = useStore();
-  const event = events.find((item) => item.id === evaluatorEventId);
-  const eventStatus = event ? getEventStatus(event) : "unconfigured";
-  const canVote = eventStatus === "active";
-  const evaluatorIsAssignedToEvent = evaluators.some((item) => item.token === evaluatorToken && item.eventId === evaluatorEventId);
-  const projects = event?.projects ?? [];
-  const investmentLimit = event?.investmentLimit ?? MAX_PER_PROJECT;
-  const [amounts, setAmounts] = useState<Record<string, number>>({});
-  const [loaded, setLoaded] = useState(false);
+  const queryClient = useQueryClient();
+  const [darkMode, setDarkMode] = useDarkMode();
+  const [amounts, setAmounts] = useState<Record<string, number> | null>(null);
   const [done, setDone] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
-  const [themeLoaded, setThemeLoaded] = useState(false);
+  const [revoked, setRevoked] = useState(false);
+
+  // Reconsulta periodicamente: se o link for revogado, a sessão perde o acesso nesta tela.
+  const contextQuery = useQuery({
+    queryKey: ["voting-context"],
+    queryFn: () => getVotingContext(),
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
+  });
+  const context = contextQuery.data;
 
   useEffect(() => {
-    setDarkMode(localStorage.getItem("avaliasam.darkMode") === "true");
-    setThemeLoaded(true);
-  }, []);
+    if (context?.status === "unauthenticated") void nav({ to: "/avaliar", replace: true });
+    if (context?.status === "revoked") setRevoked(true);
+    // Carrega os valores salvos apenas uma vez, para não sobrescrever a edição em andamento.
+    if (context?.status === "ok" && amounts === null) setAmounts(context.votes);
+  }, [context, amounts, nav]);
 
-  useEffect(() => {
-    if (themeLoaded) localStorage.setItem("avaliasam.darkMode", String(darkMode));
-  }, [darkMode, themeLoaded]);
-
-  useEffect(() => {
-    setAmounts((current) => Object.fromEntries(
-      Object.entries(current).map(([projectId, amount]) => [projectId, clampAmount(amount, investmentLimit)]),
-    ));
-  }, [investmentLimit]);
-
-  useEffect(() => {
-    if (!ready) return;
-    if (!evaluator || !evaluatorToken || !evaluatorEventId || !event || !evaluatorIsAssignedToEvent) nav({ to: "/avaliar" });
-    else if (!loaded) {
-      setAmounts(Object.fromEntries(
-        Object.entries(votes[evaluatorToken] ?? {}).map(([projectId, amount]) => [projectId, clampAmount(amount, investmentLimit)]),
-      ));
-      setLoaded(true);
-    }
-  }, [ready, evaluator, evaluatorToken, evaluatorEventId, event, evaluatorIsAssignedToEvent, investmentLimit, loaded, votes, nav]);
-
-  const set = (id: string, n: number) => setAmounts((a) => ({ ...a, [id]: clampAmount(n, investmentLimit) }));
-  const saveVotes = () => {
-    if (!event) return;
-    try {
-      store.saveEvaluatorVotes(evaluatorToken, event.id, amounts);
+  const submitMutation = useMutation({
+    mutationFn: (votes: Array<{ projectId: string; amount: number }>) =>
+      submitVotes({ data: { votes } }),
+    onSuccess: async () => {
       setDone(true);
-    } catch (error) {
-      console.error("Não foi possível salvar as avaliações.", error);
-      toast.error("Não foi possível salvar suas avaliações. Reabra o link do evento e tente novamente.");
+      await queryClient.invalidateQueries({ queryKey: ["voting-context"] });
+    },
+    onError: (error) => {
+      const message = errorMessage(error);
+      if (message === ERR.revoked) setRevoked(true);
+      else if (message === ERR.unauthenticated) void nav({ to: "/avaliar", replace: true });
+      else toast.error(message);
+    },
+  });
+
+  if (revoked) {
+    return (
+      <AuthLayout>
+        <RevokedLinkNotice />
+      </AuthLayout>
+    );
+  }
+
+  const ready = context?.status === "ok" && amounts !== null;
+  const investmentLimit = context?.status === "ok" ? context.event.investmentLimit : 0;
+  const projects = context?.status === "ok" ? context.projects : [];
+
+  const set = (id: string, n: number) =>
+    setAmounts((a) => ({ ...(a ?? {}), [id]: clampAmount(n, investmentLimit) }));
+
+  const save = () => {
+    if (!ready || submitMutation.isPending) return;
+    const votes = projects.map((project) => ({
+      projectId: project.id,
+      amount: clampAmount(amounts[project.id] ?? 0, investmentLimit),
+    }));
+    submitMutation.mutate(votes);
+  };
+
+  const logout = async () => {
+    try {
+      await evaluatorLogout();
+    } finally {
+      queryClient.removeQueries({ queryKey: ["voting-context"] });
+      await nav({ to: "/avaliar", replace: true });
     }
   };
 
@@ -78,7 +106,11 @@ function Voting() {
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
           <Logo />
           <div className="flex items-center gap-4">
-            <p className="hidden text-sm sm:block">Bem-vindo(a), <strong className="text-primary">{evaluator}</strong></p>
+            {context?.status === "ok" && (
+              <p className="hidden text-sm sm:block">
+                Bem-vindo(a), <strong className="text-primary">{context.evaluatorName}</strong>
+              </p>
+            )}
             <button
               type="button"
               onClick={() => setDarkMode((enabled) => !enabled)}
@@ -88,83 +120,215 @@ function Voting() {
             >
               {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
             </button>
-            <button onClick={() => { store.setEvaluator("", ""); nav({ to: "/avaliar", replace: true }); }} className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive"><LogOut className="h-4 w-4" /> Sair</button>
+            <button
+              type="button"
+              onClick={logout}
+              className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-destructive"
+            >
+              <LogOut className="h-4 w-4" /> Sair
+            </button>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 pb-28">
-        <div>
-          <h1 className="font-display text-2xl font-bold">{event?.name ? `Projetos · ${event.name}` : "Projetos para avaliar"}</h1>
-          <p className="text-muted-foreground">Você pode investir até {formatBRL(investmentLimit)} em cada projeto.</p>
-          {event?.description && <p className="mt-1 text-sm text-muted-foreground">{event.description}</p>}
-          {event && (
-            <span className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-              eventStatus === "active" ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
-              eventStatus === "expired" ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" :
-              "bg-muted text-muted-foreground"
-            }`}>
-              {eventStatus === "active" ? "Em andamento" :
-                eventStatus === "expired" ? "Expirado" :
-                  eventStatus === "upcoming" ? "Agendado" : "Datas pendentes"}
-            </span>
+
+      {!ready ? (
+        <main className="mx-auto max-w-6xl px-4 py-16 text-center text-sm text-muted-foreground">
+          {contextQuery.isError ? (
+            <div role="alert" className="space-y-4">
+              <p className="text-destructive">{errorMessage(contextQuery.error)}</p>
+              <button
+                type="button"
+                onClick={() => contextQuery.refetch()}
+                className="rounded-lg border px-4 py-2 font-semibold text-foreground"
+              >
+                Tentar novamente
+              </button>
+            </div>
+          ) : (
+            "Carregando projetos..."
           )}
-        </div>
-        {!canVote && event && (
-          <p role="status" className="rounded-xl border border-orange-300 bg-orange-50 p-4 text-sm font-medium text-orange-900 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-200">
-            {eventStatus === "expired"
-              ? "Este evento já foi concluído e as avaliações foram encerradas."
-              : eventStatus === "upcoming"
-                ? "As avaliações deste evento ainda não começaram."
-                : "As datas deste evento ainda não foram configuradas pelo administrador."}
-          </p>
-        )}
-        {projects.length === 0 && <p className="rounded-xl border bg-card p-8 text-center text-muted-foreground">Nenhum projeto cadastrado ainda.</p>}
-        <div className="grid gap-5 md:grid-cols-2">
-          {projects.map((p) => {
-            const v = amounts[p.id] ?? 0;
-            return (
-              <article key={p.id} className="space-y-4 rounded-xl border bg-card p-4 shadow-soft sm:p-6">
-                <div>
-                  <h2 className="font-display text-xl font-bold">{p.name}</h2>
-                  <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><Users className="h-4 w-4" /> {p.members}</p>
-                  <p className="mt-3 text-sm">{p.description}</p>
-                </div>
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <span className="font-display text-xl font-bold text-primary sm:text-2xl">{formatBRL(v)}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{investmentLimit > 0 ? Math.round((v / investmentLimit) * 100) : 0}%</span>
-                </div>
-                <input disabled={!canVote} type="range" min={0} max={investmentLimit} step={1000} value={v} onChange={(e) => set(p.id, +e.target.value)} className="w-full accent-[var(--primary)] disabled:cursor-not-allowed disabled:opacity-50" aria-label={`Investimento em ${p.name}`} />
-                <div className="flex flex-wrap gap-2">
-                  {QUICK.map((q) => (
-                    <button disabled={!canVote} key={q} onClick={() => set(p.id, v + q)} className="rounded-lg border px-3 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-50">+{q / 1000}k</button>
-                  ))}
-                  <button disabled={!canVote} onClick={() => set(p.id, investmentLimit)} className="bg-accent-grad rounded-lg px-3 py-1.5 text-sm font-semibold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50">Máx {investmentLimit / 1000}k</button>
-                  <button disabled={!canVote} onClick={() => set(p.id, 0)} className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-destructive disabled:cursor-not-allowed disabled:opacity-50">Zerar</button>
-                </div>
-                <input disabled={!canVote} inputMode="numeric" value={v.toLocaleString("pt-BR")} onChange={(e) => set(p.id, +e.target.value.replace(/\D/g, ""))} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50" aria-label="Valor em reais" />
-              </article>
-            );
-          })}
-        </div>
-      </main>
-      {projects.length > 0 && event && canVote && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl justify-end px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-            <button onClick={saveVotes} className="bg-brand flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold text-primary-foreground shadow-soft sm:w-auto">
-              <Send className="h-4 w-4" /> Salvar / Enviar Avaliações
+        </main>
+      ) : (
+        <>
+          <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 pb-28">
+            <div>
+              <h1 className="font-display text-2xl font-bold">{`Projetos · ${context.event.name}`}</h1>
+              <p className="text-muted-foreground">
+                Cada projeto tem um orçamento independente de até {formatBRL(investmentLimit)}.
+              </p>
+              {context.event.description && (
+                <p className="mt-1 text-sm text-muted-foreground">{context.event.description}</p>
+              )}
+              {context.submittedAt && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Última avaliação enviada em{" "}
+                  {new Date(context.submittedAt).toLocaleString("pt-BR")}. Você pode ajustar e
+                  enviar novamente.
+                </p>
+              )}
+            </div>
+            {projects.length === 0 && (
+              <p className="rounded-xl border bg-card p-8 text-center text-muted-foreground">
+                Nenhum projeto cadastrado ainda.
+              </p>
+            )}
+            <div className="grid gap-5 md:grid-cols-2">
+              {projects.map((p) => {
+                const v = amounts[p.id] ?? 0;
+                return (
+                  <article
+                    key={p.id}
+                    className="space-y-4 rounded-xl border bg-card p-4 shadow-soft sm:p-6"
+                  >
+                    <div>
+                      <h2 className="break-words font-display text-xl font-bold">{p.name}</h2>
+                      <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Users className="h-4 w-4 shrink-0" /> {p.members}
+                      </p>
+                      <p className="mt-3 whitespace-pre-line text-sm">{p.description}</p>
+                    </div>
+                    <ProjectLinks
+                      prototypeUrl={p.prototypeUrl}
+                      presentationUrl={p.presentationUrl}
+                      projectName={p.name}
+                    />
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="font-display text-xl font-bold text-primary sm:text-2xl">
+                        {formatBRL(v)}
+                      </span>
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        de {formatBRL(investmentLimit)} ·{" "}
+                        {investmentLimit > 0 ? Math.round((v / investmentLimit) * 100) : 0}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={investmentLimit}
+                      step={1000}
+                      value={v}
+                      onChange={(e) => set(p.id, +e.target.value)}
+                      className="w-full accent-[var(--primary)]"
+                      aria-label={`Investimento em ${p.name}`}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                      {QUICK.map((q) => (
+                        <button
+                          type="button"
+                          key={q}
+                          onClick={() => set(p.id, v + q)}
+                          className="rounded-lg border px-3 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent"
+                        >
+                          +{q / 1000}k
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => set(p.id, investmentLimit)}
+                        className="bg-accent-grad rounded-lg px-3 py-1.5 text-sm font-semibold text-accent-foreground"
+                      >
+                        Máx {compactBRL(investmentLimit)}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => set(p.id, 0)}
+                        className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-destructive"
+                      >
+                        Zerar
+                      </button>
+                    </div>
+                    <AmountInput
+                      value={v}
+                      limit={investmentLimit}
+                      label={`Valor em reais para ${p.name}`}
+                      onChange={(n) => set(p.id, n)}
+                    />
+                  </article>
+                );
+              })}
+            </div>
+          </main>
+          {projects.length > 0 && (
+            <div className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 backdrop-blur">
+              <div className="mx-auto flex max-w-6xl justify-end px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+                <button
+                  type="button"
+                  onClick={save}
+                  disabled={submitMutation.isPending}
+                  className="bg-brand flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold text-primary-foreground shadow-soft disabled:cursor-wait disabled:opacity-70 sm:w-auto"
+                >
+                  <Send className="h-4 w-4" />{" "}
+                  {submitMutation.isPending ? "Enviando..." : "Salvar / Enviar Avaliações"}
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {done && context?.status === "ok" && (
+        <div className="fixed inset-0 z-20 grid place-items-center bg-foreground/40 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-soft"
+          >
+            <CheckCircle2 className="mx-auto h-14 w-14 text-primary" />
+            <h2 className="font-display text-2xl font-bold">Obrigado, {context.evaluatorName}!</h2>
+            <p className="text-muted-foreground">Suas avaliações foram salvas com sucesso.</p>
+            <button
+              type="button"
+              onClick={() => setDone(false)}
+              className="bg-brand w-full rounded-lg py-2.5 font-semibold text-primary-foreground"
+            >
+              Fechar
             </button>
           </div>
         </div>
       )}
-      {done && (
-        <div className="fixed inset-0 z-20 grid place-items-center bg-foreground/40 px-4">
-          <div className="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-soft">
-            <CheckCircle2 className="mx-auto h-14 w-14 text-primary" />
-            <h2 className="font-display text-2xl font-bold">Obrigado, {evaluator}!</h2>
-            <p className="text-muted-foreground">Suas avaliações foram salvas com sucesso.</p>
-            <button onClick={() => setDone(false)} className="bg-brand w-full rounded-lg py-2.5 font-semibold text-primary-foreground">Fechar</button>
-          </div>
-        </div>
+    </div>
+  );
+}
+
+/**
+ * Campo numérico do investimento: enquanto focado mostra exatamente o que foi digitado
+ * (somente dígitos), sem reformatar a cada tecla; ao sair, exibe o valor formatado.
+ */
+function AmountInput({
+  value,
+  limit,
+  label,
+  onChange,
+}: {
+  value: number;
+  limit: number;
+  label: string;
+  onChange: (n: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const typed = draft === null ? null : Number(draft || "0");
+  const overLimit = typed !== null && typed > limit;
+  return (
+    <div className="space-y-1">
+      <input
+        inputMode="numeric"
+        autoComplete="off"
+        value={draft ?? value.toLocaleString("pt-BR")}
+        onFocus={() => setDraft(value === 0 ? "" : String(value))}
+        onBlur={() => setDraft(null)}
+        onChange={(e) => {
+          const digits = e.target.value.replace(/\D/g, "").slice(0, 12);
+          setDraft(digits);
+          onChange(Number(digits || "0"));
+        }}
+        aria-label={label}
+        aria-invalid={overLimit}
+        className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring"
+      />
+      {overLimit && (
+        <p className="text-xs text-destructive">
+          O máximo por projeto é {formatBRL(limit)}; o valor foi ajustado.
+        </p>
       )}
     </div>
   );
