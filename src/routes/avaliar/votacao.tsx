@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, LogOut, Moon, Send, Sun, Users } from "lucide-react";
 import { toast } from "sonner";
 import { evaluatorLogout, getVotingContext, submitVotes } from "@/api/evaluator";
@@ -38,14 +38,27 @@ function Voting() {
   const [done, setDone] = useState(false);
   const [revoked, setRevoked] = useState(false);
 
-  // Reconsulta periodicamente: se o link for revogado, a sessão perde o acesso nesta tela.
+  // O teto vem sempre do evento vinculado ao token (servidor). A consulta é refeita a cada
+  // 10 s e ao voltar para a aba: mudanças do admin no teto e revogações chegam quase na hora.
   const contextQuery = useQuery({
     queryKey: ["voting-context"],
     queryFn: () => getVotingContext(),
-    refetchInterval: 60_000,
+    refetchInterval: 10_000,
     refetchOnWindowFocus: true,
+    refetchOnMount: "always",
   });
   const context = contextQuery.data;
+
+  // Avisa quando o administrador altera o teto enquanto o avaliador está na tela.
+  const lastLimit = useRef<number | null>(null);
+  const currentLimit = context?.status === "ok" ? context.event.investmentLimit : null;
+  useEffect(() => {
+    if (currentLimit === null) return;
+    if (lastLimit.current !== null && lastLimit.current !== currentLimit) {
+      toast.info(`O teto por projeto foi atualizado para ${formatBRL(currentLimit)}.`);
+    }
+    lastLimit.current = currentLimit;
+  }, [currentLimit]);
 
   useEffect(() => {
     if (context?.status === "unauthenticated") void nav({ to: "/avaliar", replace: true });

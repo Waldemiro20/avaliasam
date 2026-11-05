@@ -7,7 +7,8 @@ export const DEFAULT_INVESTMENT_LIMIT = 100_000;
 /** Teto máximo aceito para o limite por projeto (proteção contra valores absurdos). */
 export const MAX_INVESTMENT_LIMIT = 1_000_000_000;
 
-export const clampAmount = (n: number, limit = DEFAULT_INVESTMENT_LIMIT) =>
+/** Limita o valor ao intervalo [0, teto do evento]. O teto é sempre obrigatório. */
+export const clampAmount = (n: number, limit: number) =>
   Math.max(0, Math.min(Math.max(0, limit), Math.round(Number.isFinite(n) ? n : 0)));
 
 export const formatBRL = (n: number) =>

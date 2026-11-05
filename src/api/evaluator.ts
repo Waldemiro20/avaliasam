@@ -15,7 +15,7 @@ import {
 async function findByToken(db: Db, token: string) {
   return db.evaluator.findUnique({
     where: { tokenHash: await sha256Hex(token) },
-    include: { event: { select: { id: true, name: true } } },
+    include: { event: { select: { id: true, name: true, investmentLimit: true } } },
   });
 }
 
@@ -32,6 +32,7 @@ export const getInvitation = createServerFn({ method: "POST" })
         return {
           status: "valid" as const,
           eventName: evaluator.event.name,
+          investmentLimit: evaluator.event.investmentLimit,
           evaluatorName: evaluator.name,
         };
       }),

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useQueryClient } from "@tanstack/react-query";
 import { AlertCircle, ArrowRight, Ban, Sparkles } from "lucide-react";
 import { getInvitation, getVotingContext, startEvaluatorSession } from "@/api/evaluator";
 import { AuthLayout } from "@/components/AuthLayout";
 import { ERR, errorMessage } from "@/lib/api-errors";
+import { formatBRL } from "@/lib/investment";
 import { evaluatorTokenSchema } from "@/lib/schemas";
 
 type State =
@@ -11,7 +13,13 @@ type State =
   | { kind: "invalid" }
   | { kind: "revoked" }
   | { kind: "error"; message: string }
-  | { kind: "valid"; token: string; eventName: string; evaluatorName: string };
+  | {
+      kind: "valid";
+      token: string;
+      eventName: string;
+      evaluatorName: string;
+      investmentLimit: number;
+    };
 
 export function RevokedLinkNotice() {
   return (
@@ -28,6 +36,7 @@ export function RevokedLinkNotice() {
 
 export function EvaluatorAccess() {
   const nav = useNavigate();
+  const queryClient = useQueryClient();
   const [state, setState] = useState<State>({ kind: "checking" });
   const [name, setName] = useState("");
   const [nameError, setNameError] = useState("");
@@ -56,6 +65,7 @@ export function EvaluatorAccess() {
           kind: "valid",
           token: token.data,
           eventName: invitation.eventName,
+          investmentLimit: invitation.investmentLimit,
           evaluatorName: invitation.evaluatorName,
         };
       }
@@ -78,6 +88,8 @@ export function EvaluatorAccess() {
     setPending(true);
     try {
       await startEvaluatorSession({ data: { token: state.token, name: evaluatorName } });
+      // Descarta dados de uma sessão anterior (outro avaliador/evento) neste navegador.
+      queryClient.removeQueries({ queryKey: ["voting-context"] });
       // Remove o token da barra de endereços/histórico após trocar por sessão.
       window.history.replaceState(null, "", "/avaliar");
       await nav({ to: "/avaliar/votacao" });
@@ -131,6 +143,10 @@ export function EvaluatorAccess() {
               Confirme seu nome para iniciar as avaliações
             </p>
             <p className="mt-2 text-sm font-semibold text-orange-700">{state.eventName}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              Orçamento por projeto:{" "}
+              <strong className="text-slate-700">{formatBRL(state.investmentLimit)}</strong>
+            </p>
           </div>
           <label className="block text-left text-sm font-semibold text-slate-700">
             Seu Nome Completo

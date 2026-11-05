@@ -32,8 +32,9 @@ describe("teto de investimento (parseInvestmentLimit)", () => {
 
 describe("regras de investimento", () => {
   it("limita cada investimento ao teto do projeto", () => {
-    expect(clampAmount(150_000)).toBe(100_000);
-    expect(clampAmount(-5)).toBe(0);
+    expect(clampAmount(150_000, 100_000)).toBe(100_000);
+    expect(clampAmount(150_000, 5_000)).toBe(5_000);
+    expect(clampAmount(-5, 5_000)).toBe(0);
     expect(clampAmount(25_000, 15_000)).toBe(15_000);
     expect(clampAmount(Number.NaN, 15_000)).toBe(0);
   });

@@ -80,7 +80,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: "AvaliaSAM - Sistema de Avaliação de Startups" },
-      { name: "description", content: "Avalie startups investindo virtualmente até R$ 100 mil por projeto." },
+      {
+        name: "description",
+        content: "Plataforma inteligente de avaliação e suporte a startups.",
+      },
       { property: "og:title", content: "AvaliaSAM" },
       { property: "og:description", content: "Sistema de Avaliação de Startups" },
       { property: "og:type", content: "website" },
