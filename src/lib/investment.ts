@@ -63,3 +63,38 @@ export function computeRanking<P extends RankingProject>(projects: P[], votes: R
     })
     .sort((a, b) => b.total - a.total);
 }
+
+/** Valor compacto para rótulos de botões: 500 → "500", 2500 → "2,5k", 100000 → "100k", 1500000 → "1,5M". */
+export function formatCompact(n: number): string {
+  const fmt = (v: number) => v.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  if (Math.abs(n) >= 1_000_000) return `${fmt(n / 1_000_000)}M`;
+  if (Math.abs(n) >= 1_000) return `${fmt(n / 1_000)}k`;
+  return fmt(n);
+}
+
+const NICE_STEPS = [10_000, 5_000, 1_000, 500, 100, 50, 10, 5, 1];
+
+/**
+ * Passo do slider para o teto do evento: o maior passo "redondo" que divide o teto
+ * exatamente (para o slider alcançar o máximo) e ainda gera pelo menos 50 posições
+ * (para deslizar suavemente). Ex.: 100.000 → 1.000; 500 → 10; 12.345 → 5.
+ */
+export function sliderStep(limit: number): number {
+  if (!Number.isFinite(limit) || limit <= 0) return 1;
+  return NICE_STEPS.find((step) => limit % step === 0 && limit / step >= 50) ?? 1;
+}
+
+/**
+ * Incrementos dos atalhos rápidos. Com teto acima de R$ 50 mil, mantém +10k/+20k/+50k;
+ * com teto menor, usa 10%, 20% e 50% do teto (arredondados ao passo do slider),
+ * para nunca saltar direto ao máximo.
+ */
+export function quickIncrements(limit: number): number[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  if (limit > 50_000) return [10_000, 20_000, 50_000];
+  const step = sliderStep(limit);
+  const values = [0.1, 0.2, 0.5].map((ratio) =>
+    Math.max(step, Math.round((limit * ratio) / step) * step),
+  );
+  return [...new Set(values)].filter((value) => value > 0 && value < limit);
+}

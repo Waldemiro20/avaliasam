@@ -77,3 +77,51 @@ export async function verifyPassword(password: string, stored: string): Promise<
 /** Hash fictício para igualar o tempo de resposta quando o e-mail não existe. */
 export const DUMMY_PASSWORD_HASH =
   "pbkdf2$sha256$100000$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+// ---------------------------------------------------------------- links dos avaliadores
+
+/** Deriva a chave AES-256-GCM dos links a partir do segredo do servidor (HKDF-SHA256). */
+async function linkKey(secret: string): Promise<CryptoKey> {
+  const base = await crypto.subtle.importKey("raw", encoder.encode(secret), "HKDF", false, [
+    "deriveKey",
+  ]);
+  return crypto.subtle.deriveKey(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: encoder.encode("avaliasam"),
+      info: encoder.encode("evaluator-link-v1"),
+    },
+    base,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"],
+  );
+}
+
+/** Criptografa o token do link. Formato: v1.<iv>.<ciphertext+tag> (base64url). */
+export async function encryptToken(token: string, secret: string): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    await linkKey(secret),
+    encoder.encode(token),
+  );
+  return `v1.${toBase64Url(iv)}.${toBase64Url(new Uint8Array(ciphertext))}`;
+}
+
+/** Decifra o token; retorna null se o formato for inválido ou a chave tiver mudado. */
+export async function decryptToken(payload: string, secret: string): Promise<string | null> {
+  const [version, iv, data] = payload.split(".");
+  if (version !== "v1" || !iv || !data) return null;
+  try {
+    const plain = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv: fromBase64Url(iv) as BufferSource },
+      await linkKey(secret),
+      fromBase64Url(data) as BufferSource,
+    );
+    return new TextDecoder().decode(plain);
+  } catch {
+    return null;
+  }
+}

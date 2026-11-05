@@ -30,6 +30,7 @@ export type EvaluatorMinAggregateOutputType = {
   name: string | null
   tokenHash: string | null
   tokenPrefix: string | null
+  tokenCiphertext: string | null
   revokedAt: Date | null
   submittedAt: Date | null
   createdAt: Date | null
@@ -41,6 +42,7 @@ export type EvaluatorMaxAggregateOutputType = {
   name: string | null
   tokenHash: string | null
   tokenPrefix: string | null
+  tokenCiphertext: string | null
   revokedAt: Date | null
   submittedAt: Date | null
   createdAt: Date | null
@@ -52,6 +54,7 @@ export type EvaluatorCountAggregateOutputType = {
   name: number
   tokenHash: number
   tokenPrefix: number
+  tokenCiphertext: number
   revokedAt: number
   submittedAt: number
   createdAt: number
@@ -65,6 +68,7 @@ export type EvaluatorMinAggregateInputType = {
   name?: true
   tokenHash?: true
   tokenPrefix?: true
+  tokenCiphertext?: true
   revokedAt?: true
   submittedAt?: true
   createdAt?: true
@@ -76,6 +80,7 @@ export type EvaluatorMaxAggregateInputType = {
   name?: true
   tokenHash?: true
   tokenPrefix?: true
+  tokenCiphertext?: true
   revokedAt?: true
   submittedAt?: true
   createdAt?: true
@@ -87,6 +92,7 @@ export type EvaluatorCountAggregateInputType = {
   name?: true
   tokenHash?: true
   tokenPrefix?: true
+  tokenCiphertext?: true
   revokedAt?: true
   submittedAt?: true
   createdAt?: true
@@ -171,6 +177,7 @@ export type EvaluatorGroupByOutputType = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext: string | null
   revokedAt: Date | null
   submittedAt: Date | null
   createdAt: Date
@@ -203,6 +210,7 @@ export type EvaluatorWhereInput = {
   name?: Prisma.StringFilter<"Evaluator"> | string
   tokenHash?: Prisma.StringFilter<"Evaluator"> | string
   tokenPrefix?: Prisma.StringFilter<"Evaluator"> | string
+  tokenCiphertext?: Prisma.StringNullableFilter<"Evaluator"> | string | null
   revokedAt?: Prisma.DateTimeNullableFilter<"Evaluator"> | Date | string | null
   submittedAt?: Prisma.DateTimeNullableFilter<"Evaluator"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Evaluator"> | Date | string
@@ -217,6 +225,7 @@ export type EvaluatorOrderByWithRelationInput = {
   name?: Prisma.SortOrder
   tokenHash?: Prisma.SortOrder
   tokenPrefix?: Prisma.SortOrder
+  tokenCiphertext?: Prisma.SortOrderInput | Prisma.SortOrder
   revokedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   submittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -234,6 +243,7 @@ export type EvaluatorWhereUniqueInput = Prisma.AtLeast<{
   eventId?: Prisma.UuidFilter<"Evaluator"> | string
   name?: Prisma.StringFilter<"Evaluator"> | string
   tokenPrefix?: Prisma.StringFilter<"Evaluator"> | string
+  tokenCiphertext?: Prisma.StringNullableFilter<"Evaluator"> | string | null
   revokedAt?: Prisma.DateTimeNullableFilter<"Evaluator"> | Date | string | null
   submittedAt?: Prisma.DateTimeNullableFilter<"Evaluator"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Evaluator"> | Date | string
@@ -248,6 +258,7 @@ export type EvaluatorOrderByWithAggregationInput = {
   name?: Prisma.SortOrder
   tokenHash?: Prisma.SortOrder
   tokenPrefix?: Prisma.SortOrder
+  tokenCiphertext?: Prisma.SortOrderInput | Prisma.SortOrder
   revokedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   submittedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -265,6 +276,7 @@ export type EvaluatorScalarWhereWithAggregatesInput = {
   name?: Prisma.StringWithAggregatesFilter<"Evaluator"> | string
   tokenHash?: Prisma.StringWithAggregatesFilter<"Evaluator"> | string
   tokenPrefix?: Prisma.StringWithAggregatesFilter<"Evaluator"> | string
+  tokenCiphertext?: Prisma.StringNullableWithAggregatesFilter<"Evaluator"> | string | null
   revokedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Evaluator"> | Date | string | null
   submittedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Evaluator"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"Evaluator"> | Date | string
@@ -275,6 +287,7 @@ export type EvaluatorCreateInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -289,6 +302,7 @@ export type EvaluatorUncheckedCreateInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -301,6 +315,7 @@ export type EvaluatorUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -315,6 +330,7 @@ export type EvaluatorUncheckedUpdateInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -328,6 +344,7 @@ export type EvaluatorCreateManyInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -338,6 +355,7 @@ export type EvaluatorUpdateManyMutationInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -349,6 +367,7 @@ export type EvaluatorUncheckedUpdateManyInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -370,6 +389,7 @@ export type EvaluatorCountOrderByAggregateInput = {
   name?: Prisma.SortOrder
   tokenHash?: Prisma.SortOrder
   tokenPrefix?: Prisma.SortOrder
+  tokenCiphertext?: Prisma.SortOrder
   revokedAt?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -381,6 +401,7 @@ export type EvaluatorMaxOrderByAggregateInput = {
   name?: Prisma.SortOrder
   tokenHash?: Prisma.SortOrder
   tokenPrefix?: Prisma.SortOrder
+  tokenCiphertext?: Prisma.SortOrder
   revokedAt?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -392,6 +413,7 @@ export type EvaluatorMinOrderByAggregateInput = {
   name?: Prisma.SortOrder
   tokenHash?: Prisma.SortOrder
   tokenPrefix?: Prisma.SortOrder
+  tokenCiphertext?: Prisma.SortOrder
   revokedAt?: Prisma.SortOrder
   submittedAt?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -488,6 +510,7 @@ export type EvaluatorCreateWithoutEventInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -500,6 +523,7 @@ export type EvaluatorUncheckedCreateWithoutEventInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -542,6 +566,7 @@ export type EvaluatorScalarWhereInput = {
   name?: Prisma.StringFilter<"Evaluator"> | string
   tokenHash?: Prisma.StringFilter<"Evaluator"> | string
   tokenPrefix?: Prisma.StringFilter<"Evaluator"> | string
+  tokenCiphertext?: Prisma.StringNullableFilter<"Evaluator"> | string | null
   revokedAt?: Prisma.DateTimeNullableFilter<"Evaluator"> | Date | string | null
   submittedAt?: Prisma.DateTimeNullableFilter<"Evaluator"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"Evaluator"> | Date | string
@@ -552,6 +577,7 @@ export type EvaluatorCreateWithoutVotesInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -565,6 +591,7 @@ export type EvaluatorUncheckedCreateWithoutVotesInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -592,6 +619,7 @@ export type EvaluatorUpdateWithoutVotesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -605,6 +633,7 @@ export type EvaluatorUncheckedUpdateWithoutVotesInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -616,6 +645,7 @@ export type EvaluatorCreateWithoutSessionsInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -629,6 +659,7 @@ export type EvaluatorUncheckedCreateWithoutSessionsInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -656,6 +687,7 @@ export type EvaluatorUpdateWithoutSessionsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -669,6 +701,7 @@ export type EvaluatorUncheckedUpdateWithoutSessionsInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -680,6 +713,7 @@ export type EvaluatorCreateManyEventInput = {
   name: string
   tokenHash: string
   tokenPrefix: string
+  tokenCiphertext?: string | null
   revokedAt?: Date | string | null
   submittedAt?: Date | string | null
   createdAt?: Date | string
@@ -690,6 +724,7 @@ export type EvaluatorUpdateWithoutEventInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -702,6 +737,7 @@ export type EvaluatorUncheckedUpdateWithoutEventInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -714,6 +750,7 @@ export type EvaluatorUncheckedUpdateManyWithoutEventInput = {
   name?: Prisma.StringFieldUpdateOperationsInput | string
   tokenHash?: Prisma.StringFieldUpdateOperationsInput | string
   tokenPrefix?: Prisma.StringFieldUpdateOperationsInput | string
+  tokenCiphertext?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   revokedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   submittedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -765,6 +802,7 @@ export type EvaluatorSelect<ExtArgs extends runtime.Types.Extensions.InternalArg
   name?: boolean
   tokenHash?: boolean
   tokenPrefix?: boolean
+  tokenCiphertext?: boolean
   revokedAt?: boolean
   submittedAt?: boolean
   createdAt?: boolean
@@ -780,6 +818,7 @@ export type EvaluatorSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Ext
   name?: boolean
   tokenHash?: boolean
   tokenPrefix?: boolean
+  tokenCiphertext?: boolean
   revokedAt?: boolean
   submittedAt?: boolean
   createdAt?: boolean
@@ -792,6 +831,7 @@ export type EvaluatorSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Ext
   name?: boolean
   tokenHash?: boolean
   tokenPrefix?: boolean
+  tokenCiphertext?: boolean
   revokedAt?: boolean
   submittedAt?: boolean
   createdAt?: boolean
@@ -804,12 +844,13 @@ export type EvaluatorSelectScalar = {
   name?: boolean
   tokenHash?: boolean
   tokenPrefix?: boolean
+  tokenCiphertext?: boolean
   revokedAt?: boolean
   submittedAt?: boolean
   createdAt?: boolean
 }
 
-export type EvaluatorOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventId" | "name" | "tokenHash" | "tokenPrefix" | "revokedAt" | "submittedAt" | "createdAt", ExtArgs["result"]["evaluator"]>
+export type EvaluatorOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "eventId" | "name" | "tokenHash" | "tokenPrefix" | "tokenCiphertext" | "revokedAt" | "submittedAt" | "createdAt", ExtArgs["result"]["evaluator"]>
 export type EvaluatorInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   event?: boolean | Prisma.EventDefaultArgs<ExtArgs>
   votes?: boolean | Prisma.Evaluator$votesArgs<ExtArgs>
@@ -842,6 +883,11 @@ export type $EvaluatorPayload<ExtArgs extends runtime.Types.Extensions.InternalA
      * Primeiros caracteres do token, apenas para identificação visual no painel.
      */
     tokenPrefix: string
+    /**
+     * Token criptografado (AES-256-GCM) para o admin copiar o link novamente.
+     * Nulo para convites criados antes desta coluna existir.
+     */
+    tokenCiphertext: string | null
     revokedAt: Date | null
     submittedAt: Date | null
     createdAt: Date
@@ -1276,6 +1322,7 @@ export interface EvaluatorFieldRefs {
   readonly name: Prisma.FieldRef<"Evaluator", 'String'>
   readonly tokenHash: Prisma.FieldRef<"Evaluator", 'String'>
   readonly tokenPrefix: Prisma.FieldRef<"Evaluator", 'String'>
+  readonly tokenCiphertext: Prisma.FieldRef<"Evaluator", 'String'>
   readonly revokedAt: Prisma.FieldRef<"Evaluator", 'DateTime'>
   readonly submittedAt: Prisma.FieldRef<"Evaluator", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"Evaluator", 'DateTime'>

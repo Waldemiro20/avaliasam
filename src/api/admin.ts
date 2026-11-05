@@ -10,8 +10,9 @@ import {
   projectCreateInput,
   projectUpdateInput,
 } from "@/lib/schemas";
-import { generateToken, sha256Hex } from "@/server/crypto";
+import { decryptToken, encryptToken, generateToken, sha256Hex } from "@/server/crypto";
 import { withDb, type Db } from "@/server/db";
+import { env } from "@/server/env";
 import { AppError, safely } from "@/server/errors";
 import { requireAdmin } from "@/server/guards";
 import { revokeEvaluatorSessions } from "@/server/session";
@@ -26,7 +27,12 @@ const asAdmin = <T>(fn: (db: Db) => Promise<T>) =>
 
 async function newEvaluatorToken() {
   const token = generateToken();
-  return { token, tokenHash: await sha256Hex(token), tokenPrefix: token.slice(0, 8) };
+  return {
+    token,
+    tokenHash: await sha256Hex(token),
+    tokenPrefix: token.slice(0, 8),
+    tokenCiphertext: await encryptToken(token, env().SESSION_SECRET),
+  };
 }
 
 export const listEvents = createServerFn({ method: "GET" }).handler(() =>
@@ -125,6 +131,7 @@ export const getEventDetail = createServerFn({ method: "GET" })
           id: evaluator.id,
           name: evaluator.name,
           tokenPrefix: evaluator.tokenPrefix,
+          canCopyLink: evaluator.tokenCiphertext !== null,
           revoked: evaluator.revokedAt !== null,
           submittedAt: evaluator.submittedAt?.toISOString() ?? null,
         })),
@@ -183,9 +190,9 @@ export const createEvaluator = createServerFn({ method: "POST" })
         select: { id: true },
       });
       if (!event) throw new AppError(ERR.notFound);
-      const { token, tokenHash, tokenPrefix } = await newEvaluatorToken();
+      const { token, ...stored } = await newEvaluatorToken();
       const evaluator = await db.evaluator.create({
-        data: { eventId: data.eventId, name: data.name, tokenHash, tokenPrefix },
+        data: { eventId: data.eventId, name: data.name, ...stored },
       });
       return { id: evaluator.id, name: evaluator.name, token };
     }),
@@ -196,13 +203,13 @@ export const regenerateEvaluatorLink = createServerFn({ method: "POST" })
   .validator(idInput)
   .handler(({ data }) =>
     asAdmin(async (db) => {
-      const { token, tokenHash, tokenPrefix } = await newEvaluatorToken();
+      const { token, ...stored } = await newEvaluatorToken();
       const name = await db.$transaction(async (tx) => {
         const evaluator = await tx.evaluator.findUnique({ where: { id: data.id } });
         if (!evaluator) throw new AppError(ERR.notFound);
         if (evaluator.revokedAt)
           throw new AppError("Este avaliador foi excluído e não pode receber um novo link.");
-        await tx.evaluator.update({ where: { id: data.id }, data: { tokenHash, tokenPrefix } });
+        await tx.evaluator.update({ where: { id: data.id }, data: stored });
         await revokeEvaluatorSessions(tx, data.id);
         return evaluator.name;
       });
@@ -214,6 +221,31 @@ export const regenerateEvaluatorLink = createServerFn({ method: "POST" })
  * Exclusão individual do avaliador: revoga o link e encerra as sessões ativas.
  * Os votos já enviados são preservados (dados históricos do ranking).
  */
+/** Devolve o link já existente do avaliador para o admin copiar (somente links ativos). */
+export const getEvaluatorLink = createServerFn({ method: "POST" })
+  .validator(idInput)
+  .handler(({ data }) =>
+    asAdmin(async (db) => {
+      const evaluator = await db.evaluator.findUnique({
+        where: { id: data.id },
+        select: { tokenCiphertext: true, tokenHash: true, revokedAt: true },
+      });
+      if (!evaluator) throw new AppError(ERR.notFound);
+      if (evaluator.revokedAt)
+        throw new AppError("Este avaliador foi excluído; o link não está mais ativo.");
+      const token = evaluator.tokenCiphertext
+        ? await decryptToken(evaluator.tokenCiphertext, env().SESSION_SECRET)
+        : null;
+      // Confere que o token decifrado ainda é o vigente (ex.: chave trocada ou dado antigo).
+      if (!token || (await sha256Hex(token)) !== evaluator.tokenHash) {
+        throw new AppError(
+          "O link deste avaliador não pode ser recuperado. Gere um link para ele.",
+        );
+      }
+      return { token };
+    }),
+  );
+
 export const revokeEvaluator = createServerFn({ method: "POST" })
   .validator(idInput)
   .handler(({ data }) =>

@@ -10,7 +10,13 @@ import { Logo } from "@/components/Logo";
 import { ProjectLinks } from "@/components/ProjectLinks";
 import { useDarkMode } from "@/hooks/use-dark-mode";
 import { ERR, errorMessage } from "@/lib/api-errors";
-import { clampAmount, formatBRL } from "@/lib/investment";
+import {
+  clampAmount,
+  formatBRL,
+  formatCompact,
+  quickIncrements,
+  sliderStep,
+} from "@/lib/investment";
 
 export const Route = createFileRoute("/avaliar/votacao")({
   head: () => ({
@@ -23,10 +29,6 @@ export const Route = createFileRoute("/avaliar/votacao")({
   }),
   component: Voting,
 });
-
-const QUICK = [10_000, 20_000, 50_000];
-const compactBRL = (n: number) =>
-  new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 }).format(n);
 
 function Voting() {
   const nav = useNavigate();
@@ -78,6 +80,10 @@ function Voting() {
   const ready = context?.status === "ok" && amounts !== null;
   const investmentLimit = context?.status === "ok" ? context.event.investmentLimit : 0;
   const projects = context?.status === "ok" ? context.projects : [];
+
+  // Tudo derivado do teto que o administrador configurou para o evento.
+  const step = sliderStep(investmentLimit);
+  const increments = quickIncrements(investmentLimit);
 
   const set = (id: string, n: number) =>
     setAmounts((a) => ({ ...(a ?? {}), [id]: clampAmount(n, investmentLimit) }));
@@ -174,7 +180,9 @@ function Voting() {
             )}
             <div className="grid gap-5 md:grid-cols-2">
               {projects.map((p) => {
-                const v = amounts[p.id] ?? 0;
+                const v = clampAmount(amounts[p.id] ?? 0, investmentLimit);
+                const percent = investmentLimit > 0 ? Math.round((v / investmentLimit) * 100) : 0;
+                const atMax = v >= investmentLimit;
                 return (
                   <article
                     key={p.id}
@@ -197,42 +205,51 @@ function Voting() {
                         {formatBRL(v)}
                       </span>
                       <span className="shrink-0 text-xs text-muted-foreground">
-                        de {formatBRL(investmentLimit)} ·{" "}
-                        {investmentLimit > 0 ? Math.round((v / investmentLimit) * 100) : 0}%
+                        de {formatBRL(investmentLimit)} · {percent}%
                       </span>
                     </div>
                     <input
                       type="range"
                       min={0}
                       max={investmentLimit}
-                      step={1000}
+                      step={step}
                       value={v}
-                      onChange={(e) => set(p.id, +e.target.value)}
-                      className="w-full accent-[var(--primary)]"
+                      disabled={investmentLimit <= 0}
+                      onChange={(e) => set(p.id, Number(e.target.value))}
                       aria-label={`Investimento em ${p.name}`}
+                      aria-valuetext={formatBRL(v)}
+                      style={{
+                        background: `linear-gradient(to right, var(--primary) ${percent}%, var(--muted) ${percent}%)`,
+                      }}
+                      className="h-3 w-full cursor-pointer touch-pan-y appearance-none rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 [&::-moz-range-thumb]:h-7 [&::-moz-range-thumb]:w-7 [&::-moz-range-thumb]:cursor-grab [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-4 [&::-moz-range-thumb]:border-[var(--card)] [&::-moz-range-thumb]:bg-[var(--primary)] [&::-moz-range-thumb]:shadow-md [&::-webkit-slider-thumb]:h-7 [&::-webkit-slider-thumb]:w-7 [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-4 [&::-webkit-slider-thumb]:border-[var(--card)] [&::-webkit-slider-thumb]:bg-[var(--primary)] [&::-webkit-slider-thumb]:shadow-md active:[&::-webkit-slider-thumb]:cursor-grabbing"
                     />
                     <div className="flex flex-wrap gap-2">
-                      {QUICK.map((q) => (
+                      {increments.map((inc) => (
                         <button
                           type="button"
-                          key={q}
-                          onClick={() => set(p.id, v + q)}
-                          className="rounded-lg border px-3 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent"
+                          key={inc}
+                          disabled={atMax}
+                          onClick={() => set(p.id, v + inc)}
+                          aria-label={`Somar ${formatBRL(inc)} em ${p.name}`}
+                          className="rounded-lg border px-3 py-1.5 text-sm font-semibold hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border disabled:hover:text-current"
                         >
-                          +{q / 1000}k
+                          +{formatCompact(inc)}
                         </button>
                       ))}
                       <button
                         type="button"
+                        disabled={investmentLimit <= 0 || atMax}
                         onClick={() => set(p.id, investmentLimit)}
-                        className="bg-accent-grad rounded-lg px-3 py-1.5 text-sm font-semibold text-accent-foreground"
+                        aria-label={`Investir o máximo de ${formatBRL(investmentLimit)} em ${p.name}`}
+                        className="bg-accent-grad rounded-lg px-3 py-1.5 text-sm font-semibold text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        Máx {compactBRL(investmentLimit)}
+                        Máx {formatCompact(investmentLimit)}
                       </button>
                       <button
                         type="button"
+                        disabled={v === 0}
                         onClick={() => set(p.id, 0)}
-                        className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-destructive"
+                        className="rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:text-destructive disabled:cursor-not-allowed disabled:opacity-40"
                       >
                         Zerar
                       </button>

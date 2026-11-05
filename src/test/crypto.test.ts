@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  decryptToken,
   DUMMY_PASSWORD_HASH,
+  encryptToken,
   generateToken,
   hashPassword,
   sha256Hex,
@@ -33,5 +35,26 @@ describe("criptografia do servidor", () => {
     expect(await verifyPassword("x", "texto-puro")).toBe(false);
     expect(await verifyPassword("x", "pbkdf2$sha256$999999999$a$b")).toBe(false);
     expect(await verifyPassword("x", DUMMY_PASSWORD_HASH)).toBe(false);
+  });
+});
+
+describe("links copiáveis dos avaliadores", () => {
+  const secret = "segredo-de-teste-com-mais-de-32-caracteres";
+
+  it("criptografa e decifra o token sem guardá-lo em texto puro", async () => {
+    const token = generateToken();
+    const encrypted = await encryptToken(token, secret);
+    expect(encrypted).not.toContain(token);
+    expect(await encryptToken(token, secret)).not.toBe(encrypted); // IV aleatório
+    expect(await decryptToken(encrypted, secret)).toBe(token);
+  });
+
+  it("rejeita chave errada, adulteração e formato inválido", async () => {
+    const encrypted = await encryptToken(generateToken(), secret);
+    expect(await decryptToken(encrypted, "outro-segredo-com-mais-de-32-caracteres!!")).toBeNull();
+    const [v, iv, data] = encrypted.split(".");
+    const tampered = `${v}.${iv}.${data!.slice(0, -2)}${data!.endsWith("A") ? "B" : "A"}${data!.slice(-1)}`;
+    expect(await decryptToken(tampered, secret)).toBeNull();
+    expect(await decryptToken("lixo", secret)).toBeNull();
   });
 });

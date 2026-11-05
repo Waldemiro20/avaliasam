@@ -119,6 +119,7 @@ export const EvaluatorScalarFieldEnum = {
   name: 'name',
   tokenHash: 'tokenHash',
   tokenPrefix: 'tokenPrefix',
+  tokenCiphertext: 'tokenCiphertext',
   revokedAt: 'revokedAt',
   submittedAt: 'submittedAt',
   createdAt: 'createdAt'

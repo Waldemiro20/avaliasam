@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampAmount, computeRanking, parseInvestmentLimit } from "@/lib/investment";
+import {
+  clampAmount,
+  computeRanking,
+  formatCompact,
+  parseInvestmentLimit,
+  quickIncrements,
+  sliderStep,
+} from "@/lib/investment";
 
 describe("teto de investimento (parseInvestmentLimit)", () => {
   it.each([
@@ -60,5 +67,50 @@ describe("regras de investimento", () => {
     expect(r[0]!.breakdown.map((vote) => vote.evaluator)).toEqual(["Bia", "Ana"]);
     expect(r[0]!.breakdown[0]!.revoked).toBe(true);
     expect(r[0]!.total).toBe(40_000);
+  });
+});
+
+describe("controles da avaliação (slider e atalhos)", () => {
+  it("rótulos compactos", () => {
+    expect(formatCompact(100_000)).toBe("100k");
+    expect(formatCompact(2_500)).toBe("2,5k");
+    expect(formatCompact(500)).toBe("500");
+    expect(formatCompact(1_500_000)).toBe("1,5M");
+  });
+
+  it.each([
+    [100_000, 1_000],
+    [1_000_000, 10_000],
+    [500, 10],
+    [12_345, 5],
+    [7, 1],
+    [0, 1],
+  ])("passo do slider para teto %d é %d e alcança o máximo", (limit, step) => {
+    expect(sliderStep(limit)).toBe(step);
+    if (limit > 0) expect(limit % sliderStep(limit)).toBe(0);
+  });
+
+  it("mantém +10k/+20k/+50k para tetos altos", () => {
+    expect(quickIncrements(100_000)).toEqual([10_000, 20_000, 50_000]);
+    expect(quickIncrements(1_000_000)).toEqual([10_000, 20_000, 50_000]);
+  });
+
+  it("adapta os atalhos proporcionalmente para tetos baixos", () => {
+    expect(quickIncrements(500)).toEqual([50, 100, 250]);
+    expect(quickIncrements(20_000)).toEqual([2_000, 4_000, 10_000]);
+    expect(quickIncrements(0)).toEqual([]);
+    for (const limit of [1, 3, 7, 500, 12_345, 50_000]) {
+      for (const inc of quickIncrements(limit)) {
+        expect(inc).toBeGreaterThan(0);
+        expect(inc).toBeLessThan(limit);
+      }
+    }
+  });
+
+  it("incrementos nunca ultrapassam o teto", () => {
+    const limit = 500;
+    let value = 0;
+    for (let i = 0; i < 20; i++) value = clampAmount(value + quickIncrements(limit)[2]!, limit);
+    expect(value).toBe(500);
   });
 });
