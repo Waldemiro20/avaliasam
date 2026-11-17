@@ -2,14 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle, ArrowRight, Sparkles } from "lucide-react";
 import { AuthLayout } from "@/components/AuthLayout";
-import { getEventStatus, store, type Event, type Evaluator, type EventStatus } from "@/lib/store";
-
-const statusLabel: Record<EventStatus, string> = {
-  active: "Em andamento",
-  upcoming: "Agendado",
-  expired: "Expirado",
-  unconfigured: "Datas pendentes",
-};
+import { store, type Event, type Evaluator } from "@/lib/store";
 
 export function EvaluatorAccess() {
   const nav = useNavigate();
@@ -27,10 +20,6 @@ export function EvaluatorAccess() {
     setInvitation(evaluatorInvitation);
     setEvent(evaluatorInvitation ? store.getEvent(evaluatorInvitation.eventId) ?? null : null);
     setChecked(true);
-    const refreshStatus = window.setInterval(() => {
-      if (evaluatorInvitation) setEvent(store.getEvent(evaluatorInvitation.eventId) ?? null);
-    }, 60_000);
-    return () => window.clearInterval(refreshStatus);
   }, []);
 
   const submit = (e: React.FormEvent) => {
@@ -39,7 +28,9 @@ export function EvaluatorAccess() {
     if (!evaluatorName) return;
     if (!invitation) return;
     const currentEvent = store.getEvent(invitation.eventId);
-    if (!currentEvent || getEventStatus(currentEvent) !== "active") {
+    const currentInvitation = store.getEvaluatorByToken(token);
+    if (!currentEvent || !currentInvitation || currentInvitation.eventId !== invitation.eventId) {
+      setInvitation(null);
       setEvent(currentEvent ?? null);
       return;
     }
@@ -59,27 +50,13 @@ export function EvaluatorAccess() {
         <div role="alert" className="space-y-3 rounded-3xl border border-orange-200 bg-white p-7 text-center shadow-xl shadow-slate-900/5 sm:p-9">
           <AlertCircle className="mx-auto h-8 w-8 text-orange-600" />
           <h2 className="font-display text-xl font-bold text-slate-900">Link de avaliador inválido</h2>
-          <p className="text-sm leading-6 text-slate-600">Peça ao administrador um link individual válido para acessar a votação.</p>
+          <p className="text-sm leading-6 text-slate-600">Este link não é mais válido ou foi revogado. Peça ao administrador um novo link individual para acessar a votação.</p>
         </div>
       ) : !event ? (
         <div role="alert" className="space-y-3 rounded-3xl border border-orange-200 bg-white p-7 text-center shadow-xl shadow-slate-900/5 sm:p-9">
           <AlertCircle className="mx-auto h-8 w-8 text-orange-600" />
           <h2 className="font-display text-xl font-bold text-slate-900">Evento indisponível</h2>
           <p className="text-sm leading-6 text-slate-600">Este evento não está mais disponível para avaliação.</p>
-        </div>
-      ) : getEventStatus(event) !== "active" ? (
-        <div role="status" className="space-y-3 rounded-3xl border border-slate-200 bg-white p-7 text-center shadow-xl shadow-slate-900/5 sm:p-9">
-          <span className={`mx-auto inline-flex rounded-full px-3 py-1 text-xs font-bold ${event.status === "expired" ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-700"}`}>
-            {statusLabel[getEventStatus(event)]}
-          </span>
-          <h2 className="font-display text-xl font-bold text-slate-900">{event.name}</h2>
-          <p className="text-sm leading-6 text-slate-600">
-            {event.status === "expired"
-              ? "Este evento já foi concluído e as avaliações foram encerradas."
-              : event.status === "upcoming"
-                ? "As avaliações deste evento ainda não começaram."
-                : "As datas deste evento ainda não foram configuradas pelo administrador."}
-          </p>
         </div>
       ) : (
       <form onSubmit={submit} className="space-y-6 rounded-3xl border border-slate-200 bg-white p-7 shadow-xl shadow-slate-900/5 sm:p-9">
@@ -88,7 +65,6 @@ export function EvaluatorAccess() {
           <h2 className="mt-4 font-display text-2xl font-bold tracking-tight text-slate-900">Área do Avaliador VIP</h2>
           <p className="mt-1 text-sm leading-6 text-slate-600">Confirme seu nome para iniciar as avaliações</p>
           <p className="mt-2 text-sm font-semibold text-orange-700">{event.name}</p>
-          <span className="mt-2 inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-800">Em andamento</span>
         </div>
         <label className="block text-left text-sm font-semibold text-slate-700">
           Seu Nome Completo

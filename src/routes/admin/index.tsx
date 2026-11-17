@@ -2,8 +2,9 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, CalendarDays, LogOut, Moon, Pencil, Plus, Sun, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
+import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { Logo } from "@/components/Logo";
-import { formatBRL, getEventStatus, MAX_PER_PROJECT, parseInvestmentLimit, store, useStore, type Event, type EventStatus } from "@/lib/store";
+import { formatBRL, store, useStore, type Event } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/")({
   head: () => ({
@@ -15,35 +16,9 @@ export const Route = createFileRoute("/admin/")({
   component: EventManagement,
 });
 
-type EventForm = { name: string; description: string; startDate: string; endDate: string; investmentLimit: string };
-const initialForm: EventForm = { name: "", description: "", startDate: "", endDate: "", investmentLimit: String(MAX_PER_PROJECT) };
-
-function formatDate(value: string) {
-  if (!value) return "Não definida";
-  const [year, month, day] = value.split("-").map(Number);
-  return new Intl.DateTimeFormat("pt-BR").format(new Date(year!, month! - 1, day!));
-}
-
-function StatusBadge({ status }: { status: EventStatus }) {
-  const labels: Record<EventStatus, string> = {
-    active: "Em andamento",
-    upcoming: "Agendado",
-    expired: "Expirado",
-    unconfigured: "Datas pendentes",
-  };
-  const styles: Record<EventStatus, string> = {
-    active: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300",
-    upcoming: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300",
-    expired: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300",
-    unconfigured: "bg-muted text-muted-foreground",
-  };
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[status]}`}>{labels[status]}</span>;
-}
-
 function EventManagement() {
   const nav = useNavigate();
   const { ready, isAdmin, events } = useStore();
-  const [form, setForm] = useState<EventForm>(initialForm);
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null);
@@ -65,66 +40,40 @@ function EventManagement() {
 
   const openNewEvent = () => {
     setEditingEventId(null);
-    setForm(initialForm);
     setShowForm(true);
   };
 
   const openEditEvent = (event: Event) => {
     setEditingEventId(event.id);
-    setForm({
-      name: event.name,
-      description: event.description,
-      startDate: event.startDate,
-      endDate: event.endDate,
-      investmentLimit: String(event.investmentLimit),
-    });
     setShowForm(true);
   };
 
-  const saveEvent = (e: React.FormEvent) => {
-    e.preventDefault();
-    const name = form.name.trim();
-    const investmentLimit = parseInvestmentLimit(form.investmentLimit);
-    if (!name || !form.description.trim() || !form.startDate || !form.endDate) {
-      toast.error("Preencha todos os campos obrigatórios do evento.");
-      return;
-    }
-    if (form.startDate > form.endDate) {
-      toast.error("A data de término deve ser igual ou posterior à data de início.");
-      return;
-    }
-    if (investmentLimit === null) {
-      toast.error("Informe um teto válido, usando até duas casas decimais.");
-      return;
-    }
-
-    if (editingEventId) {
-      const event = events.find((item) => item.id === editingEventId);
-      if (!event) {
-        toast.error("O evento selecionado não foi encontrado.");
-        return;
-      }
-      store.saveEvent({
-        ...event,
-        name,
-        description: form.description.trim(),
-        startDate: form.startDate,
-        endDate: form.endDate,
-        investmentLimit,
-      });
-      toast.success("Evento atualizado");
-    } else {
-      const event = store.createEvent(name, form.description, form.startDate, form.endDate, investmentLimit);
-      toast.success("Evento criado");
-      setShowForm(false);
-      setForm(initialForm);
-      nav({ to: "/admin/evento/$eventId", params: { eventId: event.id } });
-      return;
-    }
-
+  const closeForm = () => {
     setShowForm(false);
     setEditingEventId(null);
-    setForm(initialForm);
+  };
+
+  const editingEvent = editingEventId ? events.find((item) => item.id === editingEventId) : undefined;
+
+  const saveEvent = ({ name, description, investmentLimit, competencies }: EventFormValues) => {
+    try {
+      if (editingEventId) {
+        if (!editingEvent) {
+          toast.error("O evento selecionado não foi encontrado.");
+          return;
+        }
+        store.saveEvent({ ...editingEvent, name, description, investmentLimit, competencies });
+        toast.success("Evento atualizado");
+        closeForm();
+        return;
+      }
+      const event = store.createEvent(name, description, investmentLimit, competencies);
+      toast.success("Evento criado");
+      closeForm();
+      nav({ to: "/admin/evento/$eventId", params: { eventId: event.id } });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar o evento.");
+    }
   };
 
   const deleteEvent = () => {
@@ -156,7 +105,7 @@ function EventManagement() {
             <div>
               <p className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-orange-600 dark:text-[#f97316]"><CalendarDays className="h-4 w-4" /> Administração</p>
               <h1 className="mt-1 font-display text-2xl font-bold tracking-tight sm:text-3xl">Gerenciamento de Eventos</h1>
-              <p className="mt-2 text-muted-foreground">Crie eventos, acompanhe os prazos e gerencie suas avaliações.</p>
+              <p className="mt-2 text-muted-foreground">Crie eventos e gerencie suas avaliações e projetos.</p>
             </div>
             <button onClick={openNewEvent} className="bg-brand flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-semibold text-primary-foreground shadow-soft sm:w-auto">
               <Plus className="h-4 w-4" /> Novo Evento
@@ -172,19 +121,16 @@ function EventManagement() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => {
-                const status = getEventStatus(event);
                 return (
                   <article key={event.id} className="rounded-2xl border bg-card p-5 shadow-soft transition hover:border-primary/50 hover:shadow-lg">
                     <div className="flex items-start justify-between gap-3">
                       <span className="grid h-11 w-11 place-items-center rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-500/10 dark:text-[#f97316]"><CalendarDays className="h-5 w-5" /></span>
-                      <StatusBadge status={status} />
+                      <span className="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/40 dark:text-green-300">Ativo</span>
                     </div>
                     <h2 className="mt-4 font-display text-xl font-bold">{event.name}</h2>
                     <p className="mt-1 line-clamp-2 min-h-10 text-sm text-muted-foreground">{event.description || "Sem descrição"}</p>
                     <div className="mt-4 space-y-1.5 border-t pt-3 text-xs text-muted-foreground">
-                      <p>Início: <span className="font-medium text-foreground">{formatDate(event.startDate)}</span></p>
-                      <p>Término: <span className="font-medium text-foreground">{formatDate(event.endDate)}</span></p>
-                      <p className="pt-1">{event.projects.length} {event.projects.length === 1 ? "projeto" : "projetos"} · {formatBRL(event.investmentLimit)} / projeto</p>
+                      <p className="pt-1">{event.projects.length} {event.projects.length === 1 ? "projeto" : "projetos"} · {formatBRL(event.investmentLimit)} / projeto · {event.competencies.length} {event.competencies.length === 1 ? "competência" : "competências"}</p>
                     </div>
                     <div className="mt-4 flex items-center gap-2 border-t pt-4">
                       <button type="button" onClick={() => nav({ to: "/admin/evento/$eventId", params: { eventId: event.id } })} className="bg-brand flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary-foreground">
@@ -207,45 +153,19 @@ function EventManagement() {
 
       {showForm && (
         <div className="fixed inset-0 z-20 grid place-items-center overflow-y-auto bg-foreground/40 px-4 py-8">
-          <form onSubmit={saveEvent} className="w-full max-w-lg space-y-4 rounded-2xl bg-card p-6 shadow-soft">
+          <div className="w-full max-w-3xl space-y-4 rounded-2xl bg-card p-5 shadow-soft sm:p-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-xl font-bold">{editingEventId ? "Editar Evento" : "Novo Evento"}</h2>
-              <button type="button" onClick={() => setShowForm(false)} aria-label="Fechar"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={closeForm} aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
-            <label className="block space-y-1.5 text-sm font-medium">Nome do Evento
-              <input required autoFocus value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ex.: Expotec" className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-            </label>
-            <label className="block space-y-1.5 text-sm font-medium">Descrição do Evento
-              <textarea required rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-            </label>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block space-y-1.5 text-sm font-medium">Data de Início
-                <input required type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-              </label>
-              <label className="block space-y-1.5 text-sm font-medium">Data de Término
-                <input required type="date" min={form.startDate || undefined} value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-              </label>
-            </div>
-            <label className="block space-y-1.5 text-sm font-medium">Teto de Investimento por Projeto (R$)
-              <input
-                required
-                type="text"
-                inputMode="decimal"
-                value={form.investmentLimit}
-                onChange={(e) => setForm({ ...form, investmentLimit: e.target.value })}
-                onFocus={() => {
-                  const value = parseInvestmentLimit(form.investmentLimit);
-                  if (value !== null) setForm((current) => ({ ...current, investmentLimit: String(value) }));
-                }}
-                onBlur={() => {
-                  const value = parseInvestmentLimit(form.investmentLimit);
-                  if (value !== null) setForm((current) => ({ ...current, investmentLimit: formatBRL(value) }));
-                }}
-                className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring"
-              />
-            </label>
-            <button className="bg-brand w-full rounded-lg py-2.5 font-semibold text-primary-foreground">{editingEventId ? "Salvar alterações" : "Criar Evento"}</button>
-          </form>
+            <EventForm
+              key={editingEventId ?? "new"}
+              event={editingEvent}
+              autoFocus
+              submitLabel={editingEventId ? "Salvar Configurações" : "Criar Evento"}
+              onSubmit={saveEvent}
+            />
+          </div>
         </div>
       )}
 

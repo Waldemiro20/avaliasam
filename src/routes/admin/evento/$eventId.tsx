@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Copy, Link2, LogOut, Moon, Pencil, Plus, Save, Sun, Trash2, Trophy, X } from "lucide-react";
+import { Copy, Link2, LogOut, Moon, Pencil, Plus, Sun, Trash2, Trophy, X } from "lucide-react";
 import { toast } from "sonner";
+import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { Logo } from "@/components/Logo";
-import { computeRanking, formatBRL, getEventStatus, parseInvestmentLimit, store, useStore, type Project, type Votes } from "@/lib/store";
+import { computeRanking, evaluateProject, formatBRL, fromCents, store, toCents, useStore, type Evaluator, type Project, type Votes } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/evento/$eventId")({
   head: () => ({
@@ -17,14 +18,14 @@ export const Route = createFileRoute("/admin/evento/$eventId")({
   component: Admin,
 });
 
-const emptyProject = { name: "", members: "", description: "" };
+const emptyProject = { name: "", members: "", description: "", prototypeUrl: "", presentationUrl: "" };
 function Admin() {
   const nav = useNavigate();
   const { eventId } = Route.useParams();
-  const { ready, isAdmin, events, votes, evaluators } = useStore();
+  const { ready, isAdmin, events, votes, evaluators, scoreSheets } = useStore();
   const [projectForm, setProjectForm] = useState<(typeof emptyProject & { id?: string }) | null>(null);
   const [evaluatorName, setEvaluatorName] = useState("");
-  const [eventSettings, setEventSettings] = useState({ name: "", description: "", startDate: "", endDate: "", investmentLimit: "" });
+  const [deletingEvaluator, setDeletingEvaluator] = useState<Evaluator | null>(null);
   const [darkMode, setDarkMode] = useState(false);
   const [themeLoaded, setThemeLoaded] = useState(false);
 
@@ -40,17 +41,6 @@ function Admin() {
   }, [ready, isAdmin, nav]);
   const selectedEvent = events.find((event) => event.id === eventId);
   useEffect(() => {
-    if (selectedEvent) {
-      setEventSettings({
-        name: selectedEvent.name,
-        description: selectedEvent.description,
-        startDate: selectedEvent.startDate,
-        endDate: selectedEvent.endDate,
-        investmentLimit: String(selectedEvent.investmentLimit),
-      });
-    }
-  }, [selectedEvent?.id, selectedEvent?.name, selectedEvent?.description, selectedEvent?.startDate, selectedEvent?.endDate, selectedEvent?.investmentLimit]);
-  useEffect(() => {
     if (ready && isAdmin && !selectedEvent) nav({ to: "/admin", replace: true });
   }, [ready, isAdmin, selectedEvent, nav]);
 
@@ -62,13 +52,47 @@ function Admin() {
   const ranking = computeRanking(selectedEvent.projects, eventVotes, evaluatorNames);
   const highestTotal = ranking[0]?.total || 1;
   const votedEvaluatorCount = eventEvaluators.filter((evaluator) => votes[evaluator.token]).length;
+  const scoreDetails = (projectId: string) => {
+    const sheets = eventEvaluators
+      .map((evaluator) => ({ evaluator, sheet: scoreSheets[evaluator.token]?.[projectId] }))
+      .filter((item): item is { evaluator: Evaluator; sheet: NonNullable<typeof item.sheet> } => Boolean(item.sheet))
+      .map((item) => ({ ...item, result: evaluateProject(selectedEvent.competencies, item.sheet) }));
+    if (sheets.length === 0) return null;
+    const average = (values: number[]) => fromCents(Math.round(values.reduce((sum, value) => sum + toCents(value), 0) / values.length));
+    return {
+      sheets,
+      averageAmount: average(sheets.map((item) => item.result.amount)),
+      byCompetency: selectedEvent.competencies.map((competency, index) => ({
+        competency,
+        average: average(sheets.map((item) => item.result.items[index]!.amount)),
+      })),
+    };
+  };
+  // Remonta o formulário quando o evento salvo muda, para refletir os dados persistidos.
+  const settingsKey = JSON.stringify([selectedEvent.name, selectedEvent.description, selectedEvent.investmentLimit, selectedEvent.competencies]);
+  const saveEventSettings = (values: EventFormValues) => {
+    try {
+      store.saveEvent({ ...selectedEvent, ...values });
+      toast.success("Configurações do evento salvas. Os valores investidos foram recalculados.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Não foi possível salvar as configurações.");
+    }
+  };
 
   const saveProject = (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedEvent || !projectForm || !projectForm.name.trim()) return;
+    const projectDetails = {
+      ...projectForm,
+      name: projectForm.name.trim(),
+      members: projectForm.members.trim(),
+      description: projectForm.description.trim(),
+      prototypeUrl: projectForm.prototypeUrl.trim(),
+      presentationUrl: projectForm.presentationUrl.trim(),
+    };
     const projects: Project[] = projectForm.id
-      ? selectedEvent.projects.map((project) => project.id === projectForm.id ? { ...project, ...projectForm, id: project.id } : project)
-      : [...selectedEvent.projects, { ...projectForm, id: crypto.randomUUID() }];
+      ? selectedEvent.projects.map((project) => project.id === projectForm.id ? { ...project, ...projectDetails, id: project.id } : project)
+      : [...selectedEvent.projects, { ...projectDetails, id: crypto.randomUUID() }];
     store.saveEventProjects(selectedEvent.id, projects);
     toast.success(projectForm.id ? "Projeto atualizado" : "Projeto cadastrado");
     setProjectForm(null);
@@ -79,29 +103,6 @@ function Admin() {
     if (confirm("Excluir este projeto?")) {
       store.saveEventProjects(selectedEvent.id, selectedEvent.projects.filter((project) => project.id !== id));
     }
-  };
-
-  const saveEventSettings = (e: React.FormEvent) => {
-    e.preventDefault();
-    const investmentLimit = parseInvestmentLimit(eventSettings.investmentLimit);
-    if (!selectedEvent || !eventSettings.name.trim()) return;
-    if (investmentLimit === null) {
-      toast.error("Informe um teto válido, usando até duas casas decimais.");
-      return;
-    }
-    if (!eventSettings.startDate || !eventSettings.endDate || eventSettings.startDate > eventSettings.endDate) {
-      toast.error("Informe datas válidas para o evento.");
-      return;
-    }
-    store.saveEvent({
-      ...selectedEvent,
-      name: eventSettings.name.trim(),
-      description: eventSettings.description.trim(),
-      startDate: eventSettings.startDate,
-      endDate: eventSettings.endDate,
-      investmentLimit,
-    });
-    toast.success("Configurações do evento salvas");
   };
 
   const createEvaluatorLink = (e: React.FormEvent) => {
@@ -120,6 +121,18 @@ function Admin() {
     } catch (error) {
       console.error("Não foi possível copiar o link do avaliador.", error);
       toast.error("Não foi possível copiar o link. Verifique a permissão da área de transferência.");
+    }
+  };
+
+  const deleteEvaluator = () => {
+    if (!deletingEvaluator) return;
+    try {
+      store.deleteEvaluator(deletingEvaluator.token);
+      toast.success(`Link de ${deletingEvaluator.name} revogado.`);
+      setDeletingEvaluator(null);
+    } catch (error) {
+      console.error("Não foi possível revogar o link do avaliador.", error);
+      toast.error("Não foi possível revogar este link. Atualize a página e tente novamente.");
     }
   };
 
@@ -147,55 +160,12 @@ function Admin() {
             <p className="text-sm font-semibold uppercase tracking-wider text-orange-600 dark:text-[#f97316]">Evento</p>
             <h1 className="mt-1 break-words font-display text-2xl font-bold sm:text-3xl">{selectedEvent.name}</h1>
             {selectedEvent.description && <p className="mt-2 text-muted-foreground">{selectedEvent.description}</p>}
-            <span className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-              getEventStatus(selectedEvent) === "active" ? "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" :
-              getEventStatus(selectedEvent) === "expired" ? "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" :
-              "bg-muted text-muted-foreground"
-            }`}>
-              {getEventStatus(selectedEvent) === "active" ? "Em andamento" :
-                getEventStatus(selectedEvent) === "expired" ? "Expirado" :
-                  getEventStatus(selectedEvent) === "upcoming" ? "Agendado" : "Datas pendentes"}
-            </span>
-            <p className="mt-2 text-sm text-muted-foreground">Período: {selectedEvent.startDate || "—"} a {selectedEvent.endDate || "—"}</p>
+            <span className="mt-3 inline-flex rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-800 dark:bg-green-900/40 dark:text-green-300">Ativo</span>
             <p className="mt-3 text-sm text-muted-foreground">Teto individual por projeto: <strong className="text-foreground">{formatBRL(selectedEvent.investmentLimit)}</strong></p>
           </section>
           <section className="rounded-xl border bg-card p-5 shadow-soft sm:p-6">
-            <h2 className="mb-4 font-display text-lg font-bold">Configurações do evento</h2>
-            <form onSubmit={saveEventSettings} className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-1.5 text-sm font-medium">Nome do evento
-                <input required value={eventSettings.name} onChange={(e) => setEventSettings({ ...eventSettings, name: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-              </label>
-              <label className="space-y-1.5 text-sm font-medium">Teto por projeto (R$)
-                <input
-                  required
-                  type="text"
-                  inputMode="decimal"
-                  value={eventSettings.investmentLimit}
-                  onChange={(e) => setEventSettings({ ...eventSettings, investmentLimit: e.target.value })}
-                  onFocus={() => {
-                    const value = parseInvestmentLimit(eventSettings.investmentLimit);
-                    if (value !== null) setEventSettings((current) => ({ ...current, investmentLimit: String(value) }));
-                  }}
-                  onBlur={() => {
-                    const value = parseInvestmentLimit(eventSettings.investmentLimit);
-                    if (value !== null) setEventSettings((current) => ({ ...current, investmentLimit: formatBRL(value) }));
-                  }}
-                  className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring"
-                />
-              </label>
-              <label className="space-y-1.5 text-sm font-medium">Data de início
-                <input required type="date" value={eventSettings.startDate} onChange={(e) => setEventSettings({ ...eventSettings, startDate: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-              </label>
-              <label className="space-y-1.5 text-sm font-medium">Data de término
-                <input required type="date" min={eventSettings.startDate || undefined} value={eventSettings.endDate} onChange={(e) => setEventSettings({ ...eventSettings, endDate: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-              </label>
-              <label className="space-y-1.5 text-sm font-medium md:col-span-2">Descrição
-                <textarea rows={2} value={eventSettings.description} onChange={(e) => setEventSettings({ ...eventSettings, description: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2.5 outline-none focus:ring-2 focus:ring-ring" />
-              </label>
-              <button className="bg-brand flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 font-semibold text-primary-foreground md:col-span-2 sm:justify-self-end">
-                <Save className="h-4 w-4" /> Salvar configurações
-              </button>
-            </form>
+            <h2 className="mb-4 font-display text-lg font-bold">Configurações do Evento</h2>
+            <EventForm key={settingsKey} event={selectedEvent} submitLabel="Salvar Configurações" onSubmit={saveEventSettings} />
           </section>
             <section className="grid gap-4 sm:grid-cols-3">
               <Stat label="Projetos no evento" value={selectedEvent.projects.length} />
@@ -214,6 +184,24 @@ function Admin() {
                         <span className="shrink-0 font-display font-bold text-primary">{formatBRL(result.total)}</span>
                       </div>
                       <div className="h-2.5 overflow-hidden rounded-full bg-muted"><div className="bg-brand h-full rounded-full transition-all" style={{ width: `${(result.total / highestTotal) * 100}%` }} /></div>
+                      {(() => {
+                        const details = scoreDetails(result.project.id);
+                        if (!details) return null;
+                        return (
+                          <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Média investida {formatBRL(details.averageAmount)} · ver por competência</summary>
+                            <ul className="mt-2 grid gap-1 sm:grid-cols-2">{details.byCompetency.map(({ competency, average }) => <li key={competency.id} className="flex justify-between gap-2 rounded-md bg-muted px-3 py-1.5"><span className="min-w-0 truncate">{competency.name}</span><span className="shrink-0 font-medium tabular-nums">{formatBRL(average)} / {formatBRL(competency.maxAmount)}</span></li>)}</ul>
+                            <ul className="mt-3 space-y-2">{details.sheets.map(({ evaluator, sheet, result: evaluation }) => (
+                              <li key={evaluator.token} className="rounded-md border px-3 py-2">
+                                <p className="flex flex-wrap justify-between gap-2 font-semibold"><span>{evaluator.name}</span><span className="tabular-nums">{formatBRL(evaluation.amount)} / {formatBRL(evaluation.maxAmount)}</span></p>
+                                {evaluation.items.some((item) => sheet.justifications[item.competency.id]) && (
+                                  <ul className="mt-1 space-y-0.5 text-muted-foreground">{evaluation.items.filter((item) => sheet.justifications[item.competency.id]).map((item) => <li key={item.competency.id}><strong className="text-foreground">{item.competency.name} ({formatBRL(item.amount)} / {formatBRL(item.competency.maxAmount)}):</strong> {sheet.justifications[item.competency.id]}</li>)}</ul>
+                                )}
+                                {sheet.opinion && <p className="mt-1 italic text-muted-foreground">Parecer: {sheet.opinion}</p>}
+                              </li>
+                            ))}</ul>
+                          </details>
+                        );
+                      })()}
                       {result.breakdown.length > 0 && (
                         <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">Ver aportes por avaliador ({result.breakdown.length})</summary>
                           <ul className="mt-2 grid gap-1 sm:grid-cols-2">{result.breakdown.map((item, index) => <li key={`${item.evaluator}-${index}`} className="flex justify-between rounded-md bg-muted px-3 py-1.5"><span>{item.evaluator}</span><span className="font-medium">{formatBRL(item.amount)}</span></li>)}</ul>
@@ -238,7 +226,7 @@ function Admin() {
                       <tr key={project.id} className="border-t align-top">
                         <td className="py-3 font-semibold">{project.name}</td><td className="py-3">{project.members}</td><td className="hidden max-w-xs truncate py-3 text-muted-foreground md:table-cell">{project.description}</td>
                         <td className="whitespace-nowrap py-3 text-right">
-                          <button onClick={() => setProjectForm(project)} aria-label={`Editar ${project.name}`} className="p-1.5 text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => setProjectForm({ ...emptyProject, ...project, prototypeUrl: project.prototypeUrl ?? "", presentationUrl: project.presentationUrl ?? "" })} aria-label={`Editar ${project.name}`} className="p-1.5 text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                           <button onClick={() => removeProject(project.id)} aria-label={`Excluir ${project.name}`} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                         </td>
                       </tr>
@@ -261,8 +249,11 @@ function Admin() {
                 <ul className="space-y-2">
                   {eventEvaluators.map((evaluator) => (
                     <li key={evaluator.token} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3">
-                      <div className="min-w-0"><p className="truncate font-semibold">{evaluator.name}</p><p className="truncate text-xs text-muted-foreground">/avaliar?token={evaluator.token}</p></div>
-                      <button type="button" onClick={() => copyEvaluatorLink(evaluator.token)} className="flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition hover:border-primary hover:text-primary"><Copy className="h-4 w-4" /> Copiar link</button>
+                      <div className="min-w-0"><p className="truncate font-semibold">{evaluator.name}</p><p className="truncate text-xs text-muted-foreground">Link: /avaliar?token={evaluator.token}</p></div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button type="button" onClick={() => copyEvaluatorLink(evaluator.token)} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition hover:border-primary hover:text-primary"><Copy className="h-4 w-4" /> Copiar link</button>
+                        <button type="button" onClick={() => setDeletingEvaluator(evaluator)} aria-label={`Excluir link de ${evaluator.name}`} className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 transition hover:border-red-400 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"><Trash2 className="h-4 w-4" /><span className="hidden sm:inline">Excluir</span></button>
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -278,8 +269,23 @@ function Admin() {
             <label className="block space-y-1 text-sm font-medium">Nome do projeto<input required value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
             <label className="block space-y-1 text-sm font-medium">Nomes dos integrantes<input value={projectForm.members} onChange={(e) => setProjectForm({ ...projectForm, members: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
             <label className="block space-y-1 text-sm font-medium">Descrição<textarea rows={4} value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
+            <label className="block space-y-1 text-sm font-medium">Link do Protótipo (opcional)<input type="url" value={projectForm.prototypeUrl ?? ""} onChange={(e) => setProjectForm({ ...projectForm, prototypeUrl: e.target.value })} placeholder="https://..." className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
+            <label className="block space-y-1 text-sm font-medium">Link da Apresentação (opcional)<input type="url" value={projectForm.presentationUrl ?? ""} onChange={(e) => setProjectForm({ ...projectForm, presentationUrl: e.target.value })} placeholder="https://..." className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
             <button className="bg-brand w-full rounded-lg py-2.5 font-semibold text-primary-foreground">Salvar projeto</button>
           </form>
+        </div>
+      )}
+      {deletingEvaluator && (
+        <div className="fixed inset-0 z-30 grid place-items-center bg-foreground/50 px-4">
+          <section role="alertdialog" aria-modal="true" aria-labelledby="delete-evaluator-title" className="w-full max-w-md space-y-4 rounded-xl bg-card p-6 shadow-soft">
+            <h2 id="delete-evaluator-title" className="font-display text-lg font-bold">Revogar link do avaliador</h2>
+            <p className="text-sm text-muted-foreground">Deseja realmente remover este avaliador e invalidar o seu link?</p>
+            <p className="text-sm font-semibold">{deletingEvaluator.name}</p>
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setDeletingEvaluator(null)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar</button>
+              <button type="button" onClick={deleteEvaluator} className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground"><Trash2 className="h-4 w-4" /> Revogar link</button>
+            </div>
+          </section>
         </div>
       )}
     </div>

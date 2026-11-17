@@ -1,11 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { clampAmount, computeRanking } from "@/lib/store";
+import { clampAmount, computeRanking, parseInvestmentLimit } from "@/lib/store";
 
 describe("regras de investimento", () => {
   it("limita cada investimento a R$ 100.000", () => {
     expect(clampAmount(150_000)).toBe(100_000);
     expect(clampAmount(-5)).toBe(0);
     expect(clampAmount(25_000, 15_000)).toBe(15_000);
+  });
+  it("aceita tetos inteiros sem alterar os dígitos digitados", () => {
+    expect(parseInvestmentLimit("100000")).toBe(100_000);
+    expect(parseInvestmentLimit("500000")).toBe(500_000);
+    expect(parseInvestmentLimit("0")).toBe(0);
   });
   it("soma os valores de todos os avaliadores por projeto", () => {
     const r = computeRanking(
