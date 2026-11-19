@@ -52,15 +52,22 @@ export function EventForm({ event, submitLabel, autoFocus, onSubmit }: EventForm
 
   const updateCompetency = (id: string, change: Partial<Competency>) =>
     setCompetencies((list) => list.map((competency) => (competency.id === id ? { ...competency, ...change } : competency)));
-  const addCompetency = () =>
-    setCompetencies((list) => [
-      ...list,
-      { id: crypto.randomUUID(), name: "", description: "", maxAmount: Math.max(0, fromCents(differenceCents)) },
-    ]);
-  const distributeEvenly = () => {
-    const amounts = distributeAmount(investmentLimit, competencies.map(() => 1));
-    setCompetencies((list) => list.map((competency, index) => ({ ...competency, maxAmount: amounts[index]! })));
+
+  /** Divide o teto em partes iguais (em centavos; a sobra vai para as primeiras), garantindo soma === teto. */
+  const splitEvenly = (list: Competency[], limit: number): Competency[] => {
+    const amounts = distributeAmount(limit, list.map(() => 1));
+    return list.map((competency, index) => ({ ...competency, maxAmount: amounts[index]! }));
   };
+
+  const changeInvestmentLimit = (limit: number) => {
+    setInvestmentLimit(limit);
+    setCompetencies((list) => splitEvenly(list, limit));
+  };
+  const addCompetency = () =>
+    setCompetencies((list) => splitEvenly([...list, { id: crypto.randomUUID(), name: "", description: "", maxAmount: 0 }], investmentLimit));
+  const removeCompetency = (id: string) =>
+    setCompetencies((list) => splitEvenly(list.filter((item) => item.id !== id), investmentLimit));
+  const distributeEvenly = () => setCompetencies((list) => splitEvenly(list, investmentLimit));
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,7 +110,7 @@ export function EventForm({ event, submitLabel, autoFocus, onSubmit }: EventForm
         </label>
         <label className="space-y-1.5 text-sm font-medium">
           Teto de Investimento por Projeto
-          <MoneyInput value={investmentLimit} onChange={setInvestmentLimit} aria-label="Teto de Investimento por Projeto (R$)" />
+          <MoneyInput value={investmentLimit} onChange={changeInvestmentLimit} aria-label="Teto de Investimento por Projeto (R$)" />
         </label>
         <label className="space-y-1.5 text-sm font-medium md:col-span-2">
           Descrição do Evento
@@ -173,7 +180,7 @@ export function EventForm({ event, submitLabel, autoFocus, onSubmit }: EventForm
                 </label>
                 <button
                   type="button"
-                  onClick={() => setCompetencies((list) => list.filter((item) => item.id !== competency.id))}
+                  onClick={() => removeCompetency(competency.id)}
                   aria-label={`Remover ${competency.name || `competência ${index + 1}`}`}
                   title="Remover competência"
                   className="justify-self-end rounded-lg p-2 text-muted-foreground transition hover:text-destructive"

@@ -90,7 +90,7 @@ function Voting() {
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8 pb-28">
+      <main className="mx-auto max-w-6xl space-y-6 px-4 py-8">
         <div>
           <h1 className="font-display text-2xl font-bold">{event?.name ? `Projetos · ${event.name}` : "Projetos para avaliar"}</h1>
           <p className="text-muted-foreground">
@@ -146,16 +146,14 @@ function Voting() {
             );
           })}
         </div>
-      </main>
-      {projects.length > 0 && event && canVote && (
-        <div className="fixed inset-x-0 bottom-0 z-10 border-t bg-card/95 backdrop-blur">
-          <div className="mx-auto flex max-w-6xl justify-end px-4 pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+        {projects.length > 0 && event && canVote && (
+          <div className="mt-6 flex w-full justify-center">
             <button onClick={saveVotes} className="bg-brand flex w-full items-center justify-center gap-2 rounded-lg px-6 py-3 font-semibold text-primary-foreground shadow-soft sm:w-auto">
               <Send className="h-4 w-4" /> Salvar / Enviar Avaliações
             </button>
           </div>
-        </div>
-      )}
+        )}
+      </main>
       {done && (
         <div className="fixed inset-0 z-20 grid place-items-center bg-foreground/40 px-4">
           <div className="w-full max-w-sm space-y-4 rounded-xl bg-card p-8 text-center shadow-soft">

@@ -23,23 +23,39 @@ describe("EventForm", () => {
     expect(values.competencies.map((c: { maxAmount: number }) => c.maxAmount)).toEqual([20_000, 20_000, 20_000, 20_000, 20_000]);
   });
 
-  it("atualiza o indicador ao mudar o teto e bloqueia o envio quando a soma não fecha", () => {
+  it("redistribui igualmente ao mudar o teto, adicionar ou remover competências", () => {
     const onSubmit = vi.fn();
     render(<EventForm submitLabel="Criar Evento" onSubmit={onSubmit} />);
     fill();
-    fireEvent.change(teto(), { target: { value: "50000" } }); // R$ 500,00
-    expect(indicator()).toHaveTextContent(/Teto do Projeto:\s*R\$\s*500,00/);
-    expect(indicator()).toHaveTextContent(/Excedente:\s*R\$\s*99\.500,00/);
+    const maxValues = () => screen.getAllByLabelText(/^Valor máximo de investimento da competência/).map((el) => (el as HTMLInputElement).value);
+    fireEvent.change(teto(), { target: { value: "100000" } }); // R$ 1.000,00
+    expect(indicator()).toHaveTextContent(/Teto do Projeto:\s*R\$\s*1\.000,00/);
+    expect(indicator()).toHaveTextContent("Distribuição fechada");
+    expect(maxValues()).toEqual(["200,00", "200,00", "200,00", "200,00", "200,00"]);
+
+    fireEvent.click(screen.getByRole("button", { name: /Adicionar competência/ }));
+    expect(maxValues()).toEqual(["166,67", "166,67", "166,67", "166,67", "166,66", "166,66"]);
+    expect(indicator()).toHaveTextContent("Distribuição fechada");
+
+    fireEvent.click(screen.getByRole("button", { name: "Remover competência 6" }));
+    expect(maxValues()).toEqual(["200,00", "200,00", "200,00", "200,00", "200,00"]);
+  });
+
+  it("permite ajuste manual e bloqueia o envio quando a soma não fecha", () => {
+    const onSubmit = vi.fn();
+    render(<EventForm submitLabel="Criar Evento" onSubmit={onSubmit} />);
+    fill();
+    fireEvent.change(teto(), { target: { value: "50000" } }); // R$ 500,00 → 100,00 cada
+    expect(indicator()).toHaveTextContent("Distribuição fechada");
+    fireEvent.change(screen.getByLabelText("Valor máximo de investimento da competência 1 (R$)"), { target: { value: "5000" } });
+    expect(indicator()).toHaveTextContent(/Restante:\s*R\$\s*50,00/);
     expect(screen.getByRole("alert")).toHaveTextContent(/não bate com o Teto de Investimento do Projeto/);
-    expect(screen.getByRole("button", { name: /Criar Evento/ })).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(screen.getByRole("button", { name: /Criar Evento/ }));
     expect(onSubmit).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole("button", { name: /Distribuir igualmente/ }));
     expect(indicator()).toHaveTextContent("Distribuição fechada");
-    fireEvent.change(screen.getByLabelText("Valor máximo de investimento da competência 1 (R$)"), { target: { value: "5000" } });
-    expect(indicator()).toHaveTextContent(/Restante:\s*R\$\s*50,00/);
     fireEvent.click(screen.getByRole("button", { name: /Criar Evento/ }));
-    expect(onSubmit).not.toHaveBeenCalled();
+    expect(onSubmit.mock.calls[0]![0].competencies.map((c: { maxAmount: number }) => c.maxAmount)).toEqual([100, 100, 100, 100, 100]);
   });
 });

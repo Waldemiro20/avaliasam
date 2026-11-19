@@ -17,7 +17,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
             O futuro começa com uma <span className="bg-gradient-to-r from-emerald-300 to-orange-300 bg-clip-text text-transparent">boa ideia.</span>
           </h1>
           <p className="mt-4 max-w-xl text-sm leading-6 text-slate-300 sm:mt-5 sm:text-base sm:leading-7">
-            Sistema de avaliação de startups. Cada avaliador investe até R$ 100.000 por projeto.
+            Sistema de avaliação de startups.
           </p>
         </div>
         <div className="relative z-10 flex items-center gap-3 text-xs text-slate-500">
