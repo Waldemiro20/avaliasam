@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
+import { adminPull, adminPush, evaluatorPull, evaluatorPush, type Json } from "./cloud-api";
 import type { StoredFile } from "./files";
 
 export const MAX_PER_PROJECT = 100_000;
@@ -130,8 +132,11 @@ const K = {
   evaluatorEvent: "avaliasam.evaluatorEvent",
   evaluators: "avaliasam.evaluators",
   scores: "avaliasam.scores",
+  adminKey: "avaliasam.adminKey",
 };
 const EVT = "avaliasam:change";
+/** Chaves compartilhadas com a nuvem; as demais (sessão, tema) ficam só neste navegador. */
+const SHARED_KEYS = new Set([K.events, K.evaluators, K.votes, K.scores]);
 
 function read<T>(key: string, fallback: T): T {
   if (typeof window === "undefined") return fallback;
@@ -144,6 +149,10 @@ function read<T>(key: string, fallback: T): T {
 }
 function write(key: string, value: unknown) {
   localStorage.setItem(key, JSON.stringify(value));
+  if (cloud.enabled && SHARED_KEYS.has(key)) {
+    cloud.version++;
+    schedulePush();
+  }
   window.dispatchEvent(new Event(EVT));
 }
 
@@ -458,29 +467,241 @@ export const store = {
   },
   getEvaluatorByToken: (token: string) => read<Evaluator[]>(K.evaluators, []).find((evaluator) => evaluator.token === token),
   isAdmin: () => read<boolean>(K.admin, false),
-  setAdmin: (v: boolean) => write(K.admin, v),
+  setAdmin: (v: boolean, password = "") => {
+    cloud.mode = "";
+    write(K.adminKey, v ? password || ADMIN_PASSWORD : "");
+    write(K.admin, v);
+  },
+  getAdminKey,
+  isCloudEnabled: () => cloud.enabled,
+  /** Aguarda o envio das alterações pendentes para a nuvem; rejeita se falhar. */
+  flush: async () => {
+    if (!cloud.enabled) return;
+    if (cloud.timer) {
+      clearTimeout(cloud.timer);
+      cloud.timer = null;
+    }
+    cloud.chain = cloud.chain.then(pushNow);
+    await cloud.chain;
+    if (cloud.error) throw cloud.error;
+  },
   getEvaluator: () => read<string>(K.evaluator, ""),
   getEvaluatorToken: () => read<string>(K.evaluatorToken, ""),
   getEvaluatorEventId: () => read<string>(K.evaluatorEvent, "") || store.getEvaluatorByToken(read<string>(K.evaluatorToken, ""))?.eventId || "",
   setEvaluator: (name: string, token = "", eventId = "") => {
+    cloud.mode = "";
     write(K.evaluator, name);
     write(K.evaluatorToken, token);
     write(K.evaluatorEvent, eventId);
   },
 };
 
-/** Reactive hook over the localStorage store (client only). */
+/* ------------------------------------------------------------------ */
+/* Sincronização com a nuvem (Supabase via server functions).          */
+/* O localStorage funciona como cache: ao abrir a página os dados vêm  */
+/* da nuvem, e cada alteração local é enviada de volta.                */
+/* ------------------------------------------------------------------ */
+
+const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+const cloud = {
+  enabled: false,
+  mode: "",
+  hydrating: null as Promise<void> | null,
+  /** Incrementa a cada escrita local; um pull que começou antes de uma escrita é descartado. */
+  version: 0,
+  timer: null as ReturnType<typeof setTimeout> | null,
+  chain: Promise.resolve(),
+  error: null as unknown,
+  /** Último valor (JSON) confirmado na nuvem, por chave da tabela. */
+  synced: new Map<string, string>(),
+};
+
+function getAdminKey() {
+  return read<string>(K.adminKey, "") || ADMIN_PASSWORD;
+}
+
+/** Extrai o token do convite da URL, tolerando parâmetros extras ou texto colado pelo WhatsApp. */
+export function tokenFromUrl(): string {
+  if (typeof window === "undefined") return "";
+  const raw = new URLSearchParams(window.location.search).get("token") ?? "";
+  let href = window.location.href;
+  try {
+    href = decodeURIComponent(href);
+  } catch {
+    /* mantém a URL original */
+  }
+  const match = (raw || href).match(UUID_RE) ?? href.match(UUID_RE);
+  return match ? match[0].toLowerCase() : raw.trim();
+}
+
+function schedulePush() {
+  if (cloud.timer) return;
+  cloud.timer = setTimeout(() => {
+    cloud.timer = null;
+    cloud.chain = cloud.chain.then(pushNow);
+  }, 0);
+}
+
+async function pushNow() {
+  try {
+    await pushChanges();
+    cloud.error = null;
+  } catch (error) {
+    cloud.error = error;
+    console.error("Falha ao salvar na nuvem.", error);
+    toast.error("Não foi possível salvar na nuvem. Verifique a conexão e tente novamente.");
+  }
+}
+
+async function pushChanges() {
+  const isAdmin = read<boolean>(K.admin, false);
+  const votes = read<Votes>(K.votes, {});
+  const scores = read<ScoreSheets>(K.scores, {});
+  const ownToken = read<string>(K.evaluatorToken, "");
+  const desired = new Map<string, Json>();
+  if (isAdmin) {
+    desired.set("events", read<Json[]>(K.events, []));
+    desired.set("evaluators", read<Json[]>(K.evaluators, []));
+  }
+  const tokens = isAdmin ? new Set([...Object.keys(votes), ...Object.keys(scores)]) : new Set(ownToken ? [ownToken] : []);
+  for (const token of tokens) {
+    if (!UUID_RE.test(token)) continue;
+    if (votes[token]) desired.set(`votes:${token}`, votes[token] as Json);
+    if (scores[token]) desired.set(`scores:${token}`, scores[token] as unknown as Json);
+  }
+
+  const set = [...desired].filter(([key, value]) => cloud.synced.get(key) !== JSON.stringify(value)).map(([key, value]) => ({ key, value }));
+  const remove = isAdmin ? [...cloud.synced.keys()].filter((key) => !desired.has(key)) : [];
+  if (set.length === 0 && remove.length === 0) return;
+
+  if (isAdmin) {
+    await adminPush({ data: { password: getAdminKey(), set, remove } });
+  } else {
+    await evaluatorPush({ data: { token: ownToken, votes: votes[ownToken] ?? {}, scores: scores[ownToken] ?? {} } });
+    set.push({ key: `votes:${ownToken}`, value: votes[ownToken] ?? {} }, { key: `scores:${ownToken}`, value: scores[ownToken] ?? {} });
+  }
+  for (const { key, value } of set) cloud.synced.set(key, JSON.stringify(value));
+  for (const key of remove) cloud.synced.delete(key);
+}
+
+function applyShared(values: { events: unknown; evaluators: unknown; votes: unknown; scores: unknown }) {
+  localStorage.setItem(K.events, JSON.stringify(values.events));
+  localStorage.setItem(K.evaluators, JSON.stringify(values.evaluators));
+  localStorage.setItem(K.votes, JSON.stringify(values.votes));
+  localStorage.setItem(K.scores, JSON.stringify(values.scores));
+  window.dispatchEvent(new Event(EVT));
+}
+
+async function pull(mode: string) {
+  const before = cloud.version;
+  const stale = () => cloud.version !== before || cloud.timer !== null;
+
+  if (mode === "admin") {
+    let state: Awaited<ReturnType<typeof adminPull>>;
+    try {
+      state = await adminPull({ data: { password: getAdminKey() } });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes("Sessão")) {
+        store.setAdmin(false);
+        toast.error(error.message);
+        return;
+      }
+      throw error;
+    }
+    if (!state) {
+      cloud.enabled = false;
+      return;
+    }
+    cloud.enabled = true;
+    if (state.events === null) {
+      // Nuvem vazia: envia os dados que já existem neste navegador.
+      getEvents();
+      cloud.synced.clear();
+      await store.flush();
+      toast.success("Dados deste navegador enviados para a nuvem.");
+      return;
+    }
+    if (stale()) return;
+    cloud.synced = new Map<string, string>([
+      ["events", JSON.stringify(state.events)],
+      ["evaluators", JSON.stringify(state.evaluators)],
+      ...Object.entries(state.votes).map(([token, value]) => [`votes:${token}`, JSON.stringify(value)] as [string, string]),
+      ...Object.entries(state.scores).map(([token, value]) => [`scores:${token}`, JSON.stringify(value)] as [string, string]),
+    ]);
+    applyShared(state);
+    return;
+  }
+
+  if (mode.startsWith("eval:")) {
+    const token = mode.slice(5);
+    const state = await evaluatorPull({ data: { token } });
+    if (!state) {
+      cloud.enabled = false;
+      return;
+    }
+    cloud.enabled = true;
+    if (state.empty || stale()) return;
+    const own = state.evaluator?.token ?? token;
+    cloud.synced = new Map();
+    if (state.votes) cloud.synced.set(`votes:${own}`, JSON.stringify(state.votes));
+    if (state.scores) cloud.synced.set(`scores:${own}`, JSON.stringify(state.scores));
+    applyShared({
+      events: state.event ? [state.event] : [],
+      evaluators: state.evaluator ? [state.evaluator] : [],
+      votes: state.votes ? { [own]: state.votes } : {},
+      scores: state.scores ? { [own]: state.scores } : {},
+    });
+  }
+}
+
+/**
+ * Carrega o estado compartilhado da nuvem para este navegador.
+ * `token` é o convite vindo da URL (/avaliar?token=...); `force` refaz a leitura (foco da aba, polling).
+ */
+export function syncFromCloud(token = "", force = false): Promise<void> {
+  if (typeof window === "undefined") return Promise.resolve();
+  const evaluatorToken = token || read<string>(K.evaluatorToken, "");
+  const mode = read<boolean>(K.admin, false) ? "admin" : evaluatorToken ? `eval:${evaluatorToken}` : "none";
+  if (mode === "none") return Promise.resolve();
+  if (cloud.mode === mode && cloud.hydrating && !force) return cloud.hydrating;
+  if (force && cloud.timer) return cloud.hydrating ?? Promise.resolve();
+  cloud.mode = mode;
+  cloud.hydrating = cloud.chain.then(() => pull(mode)).catch((error) => {
+    console.error("Não foi possível carregar os dados da nuvem.", error);
+    if (!force) toast.error("Não foi possível carregar os dados mais recentes. Verifique a conexão.");
+  });
+  return cloud.hydrating;
+}
+
+/** Reactive hook over the store (client only). Fica `ready` depois de carregar os dados da nuvem. */
 export function useStore() {
   const [, setTick] = useState(0);
   const [ready, setReady] = useState(false);
   useEffect(() => {
-    setReady(true);
+    let alive = true;
+    void syncFromCloud().finally(() => {
+      if (alive) setReady(true);
+    });
     const f = () => setTick((t) => t + 1);
+    const refresh = () => {
+      if (document.visibilityState === "visible") void syncFromCloud("", true);
+    };
+    // O painel do admin acompanha votos chegando de outros aparelhos.
+    const interval = setInterval(() => {
+      if (read<boolean>(K.admin, false)) refresh();
+    }, 15_000);
     window.addEventListener(EVT, f);
     window.addEventListener("storage", f);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
     return () => {
+      alive = false;
+      clearInterval(interval);
       window.removeEventListener(EVT, f);
       window.removeEventListener("storage", f);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, []);
   return {

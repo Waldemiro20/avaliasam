@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { AlertCircle, ArrowRight, Sparkles } from "lucide-react";
 import { AuthLayout } from "@/components/AuthLayout";
-import { store, type Event, type Evaluator } from "@/lib/store";
+import { store, syncFromCloud, tokenFromUrl, type Event, type Evaluator } from "@/lib/store";
 
 export function EvaluatorAccess() {
   const nav = useNavigate();
@@ -14,12 +14,20 @@ export function EvaluatorAccess() {
   const [nameError, setNameError] = useState("");
 
   useEffect(() => {
-    const invitationToken = new URLSearchParams(window.location.search).get("token") ?? "";
-    const evaluatorInvitation = invitationToken ? store.getEvaluatorByToken(invitationToken) ?? null : null;
-    setToken(invitationToken);
-    setInvitation(evaluatorInvitation);
-    setEvent(evaluatorInvitation ? store.getEvent(evaluatorInvitation.eventId) ?? null : null);
-    setChecked(true);
+    let alive = true;
+    const invitationToken = tokenFromUrl();
+    // Busca o convite na nuvem: o link precisa funcionar em qualquer aparelho, não só onde foi criado.
+    void syncFromCloud(invitationToken).finally(() => {
+      if (!alive) return;
+      const evaluatorInvitation = invitationToken ? store.getEvaluatorByToken(invitationToken) ?? null : null;
+      setToken(evaluatorInvitation?.token ?? invitationToken);
+      setInvitation(evaluatorInvitation);
+      setEvent(evaluatorInvitation ? store.getEvent(evaluatorInvitation.eventId) ?? null : null);
+      setChecked(true);
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const submit = (e: React.FormEvent) => {
@@ -71,16 +79,18 @@ export function EvaluatorAccess() {
           <input
             autoFocus
             required
+            autoComplete="name"
+            autoCapitalize="words"
             value={name}
             onChange={(e) => { setName(e.target.value); setNameError(""); }}
             placeholder={invitation.name}
-            className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
+            className="mt-2 min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-normal outline-none transition placeholder:text-slate-400 focus:border-orange-500 focus:bg-white focus:ring-4 focus:ring-orange-500/10"
           />
           {nameError && <span role="alert" className="mt-1 block text-xs font-medium text-red-600">{nameError}</span>}
         </label>
         <button
           disabled={!name.trim()}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 font-semibold text-white shadow-lg shadow-orange-700/15 transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/25 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-orange-500 py-3 text-base font-semibold text-white shadow-lg shadow-orange-700/15 transition hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-orange-500/25 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Entrar na Sala de Votação <ArrowRight className="h-4 w-4" />
         </button>

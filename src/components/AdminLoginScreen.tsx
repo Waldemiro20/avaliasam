@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router";
 import { Eye, EyeOff, KeyRound, LockKeyhole, LogIn, Mail } from "lucide-react";
 import { toast } from "sonner";
 import { AuthLayout } from "@/components/AuthLayout";
+import { adminLogin } from "@/lib/cloud-api";
 import { ADMIN_EMAIL, ADMIN_PASSWORD, store } from "@/lib/store";
 
 export function AdminLoginScreen() {
@@ -10,11 +11,22 @@ export function AdminLoginScreen() {
   const [email, setEmail] = useState(ADMIN_EMAIL);
   const [password, setPassword] = useState(ADMIN_PASSWORD);
   const [show, setShow] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      store.setAdmin(true);
+    setLoading(true);
+    let ok: boolean;
+    try {
+      // O servidor confere a senha (pode ser trocada pela variável ADMIN_PASSWORD na Vercel).
+      ok = (await adminLogin({ data: { email, password } })).ok;
+    } catch (error) {
+      console.error("Login pelo servidor indisponível; usando a verificação local.", error);
+      ok = email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD;
+    }
+    setLoading(false);
+    if (ok) {
+      store.setAdmin(true, password);
       nav({ to: "/admin" });
     } else toast.error("E-mail ou senha inválidos");
   };
@@ -36,7 +48,7 @@ export function AdminLoginScreen() {
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 font-normal outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-3 text-base font-normal outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             />
           </span>
         </label>
@@ -49,7 +61,7 @@ export function AdminLoginScreen() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-11 font-normal outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
+              className="min-h-12 w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-11 text-base font-normal outline-none transition focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10"
             />
             <button
               type="button"
@@ -61,8 +73,8 @@ export function AdminLoginScreen() {
             </button>
           </span>
         </label>
-        <button className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 font-semibold text-white shadow-lg shadow-emerald-700/15 transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/25">
-          <LogIn className="h-4 w-4" /> Entrar no Painel
+        <button disabled={loading} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-base font-semibold disabled:opacity-60 text-white shadow-lg shadow-emerald-700/15 transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-emerald-500/25">
+          <LogIn className="h-4 w-4" /> {loading ? "Entrando..." : "Entrar no Painel"}
         </button>
       </form>
     </AuthLayout>

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { Logo } from "@/components/Logo";
 import { ProjectFileField } from "@/components/ProjectFileField";
-import { deleteFile, type StoredFile } from "@/lib/files";
+import { deleteFile, migrateLocalFilesToCloud, type StoredFile } from "@/lib/files";
 import { computeRanking, evaluateProject, formatBRL, fromCents, store, toCents, useStore, type Evaluator, type Project, type Votes } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/evento/$eventId")({
@@ -42,6 +42,9 @@ function Admin() {
   useEffect(() => {
     if (ready && !isAdmin) nav({ to: "/admin/login" });
   }, [ready, isAdmin, nav]);
+  useEffect(() => {
+    if (ready && isAdmin) void migrateLocalFilesToCloud();
+  }, [ready, isAdmin]);
   const selectedEvent = events.find((event) => event.id === eventId);
   useEffect(() => {
     if (ready && isAdmin && !selectedEvent) nav({ to: "/admin", replace: true });
@@ -99,7 +102,7 @@ function Admin() {
       ? selectedEvent.projects.map((project) => project.id === previous.id ? { ...project, ...projectDetails, id: project.id } : project)
       : [...selectedEvent.projects, { ...projectDetails, id: crypto.randomUUID() }];
     for (const old of [previous?.prototypeFile, previous?.presentationFile]) {
-      if (old && old.id !== projectDetails.prototypeFile?.id && old.id !== projectDetails.presentationFile?.id) void deleteFile(old.id);
+      if (old && old.id !== projectDetails.prototypeFile?.id && old.id !== projectDetails.presentationFile?.id) void deleteFile(old);
     }
     store.saveEventProjects(selectedEvent.id, projects);
     toast.success(projectForm.id ? "Projeto atualizado" : "Projeto cadastrado");
@@ -111,7 +114,7 @@ function Admin() {
     if (confirm("Excluir este projeto?")) {
       const removed = selectedEvent.projects.find((project) => project.id === id);
       store.saveEventProjects(selectedEvent.id, selectedEvent.projects.filter((project) => project.id !== id));
-      for (const file of [removed?.prototypeFile, removed?.presentationFile]) if (file) void deleteFile(file.id);
+      for (const file of [removed?.prototypeFile, removed?.presentationFile]) if (file) void deleteFile(file);
     }
   };
 
@@ -165,7 +168,7 @@ function Admin() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl space-y-7 px-4 py-8">
+      <main className="mx-auto max-w-6xl space-y-7 px-4 py-6 sm:py-8">
           <section className="rounded-2xl border bg-card p-5 shadow-soft sm:p-6">
             <p className="text-sm font-semibold uppercase tracking-wider text-orange-600 dark:text-[#f97316]">Evento</p>
             <h1 className="mt-1 break-words font-display text-2xl font-bold sm:text-3xl">{selectedEvent.name}</h1>
@@ -229,12 +232,12 @@ function Admin() {
                 <button onClick={() => setProjectForm(emptyProject)} className="bg-brand flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-primary-foreground"><Plus className="h-4 w-4" /> Novo projeto</button>
               </div>
               {selectedEvent.projects.length === 0 ? <p className="py-5 text-center text-sm text-muted-foreground">Ainda não há projetos neste evento.</p> : (
-                <div className="overflow-x-auto">
+                <div className="-mx-1 overflow-x-auto overscroll-x-contain px-1 [-webkit-overflow-scrolling:touch]">
                   <table className="w-full text-left text-sm">
-                    <thead className="text-muted-foreground"><tr><th className="py-2">Projeto</th><th>Equipe</th><th className="hidden md:table-cell">Descrição</th><th /></tr></thead>
+                    <thead className="text-muted-foreground"><tr><th className="py-2">Projeto</th><th className="hidden sm:table-cell">Equipe</th><th className="hidden md:table-cell">Descrição</th><th /></tr></thead>
                     <tbody>{selectedEvent.projects.map((project) => (
                       <tr key={project.id} className="border-t align-top">
-                        <td className="py-3 font-semibold">{project.name}</td><td className="py-3">{project.members}</td><td className="hidden max-w-xs truncate py-3 text-muted-foreground md:table-cell">{project.description}</td>
+                        <td className="break-words py-3 pr-2 font-semibold">{project.name}<span className="block text-xs font-normal text-muted-foreground sm:hidden">{project.members}</span></td><td className="hidden py-3 sm:table-cell">{project.members}</td><td className="hidden max-w-xs truncate py-3 text-muted-foreground md:table-cell">{project.description}</td>
                         <td className="whitespace-nowrap py-3 text-right">
                           <button onClick={() => setProjectForm({ id: project.id, name: project.name, members: project.members, description: project.description, prototypeUrl: project.prototypeUrl ?? "", presentationUrl: project.presentationUrl ?? "", prototypeFile: project.prototypeFile, presentationFile: project.presentationFile })} aria-label={`Editar ${project.name}`} className="p-1.5 text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                           <button onClick={() => removeProject(project.id)} aria-label={`Excluir ${project.name}`} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
@@ -258,10 +261,10 @@ function Admin() {
               {eventEvaluators.length === 0 ? <p className="text-sm text-muted-foreground">Nenhum avaliador convidado neste evento.</p> : (
                 <ul className="space-y-2">
                   {eventEvaluators.map((evaluator) => (
-                    <li key={evaluator.token} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-background px-4 py-3">
-                      <div className="min-w-0"><p className="truncate font-semibold">{evaluator.name}</p><p className="truncate text-xs text-muted-foreground">Link: /avaliar?token={evaluator.token}</p></div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <button type="button" onClick={() => copyEvaluatorLink(evaluator.token)} className="flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold transition hover:border-primary hover:text-primary"><Copy className="h-4 w-4" /> Copiar link</button>
+                    <li key={evaluator.token} className="flex flex-col gap-3 rounded-lg border bg-background px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0"><p className="truncate font-semibold">{evaluator.name}</p><p className="break-all text-xs text-muted-foreground sm:truncate">Link: /avaliar?token={evaluator.token}</p></div>
+                      <div className="flex w-full shrink-0 items-center gap-2 sm:w-auto">
+                        <button type="button" onClick={() => copyEvaluatorLink(evaluator.token)} className="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 sm:flex-none text-sm font-semibold transition hover:border-primary hover:text-primary"><Copy className="h-4 w-4" /> Copiar link</button>
                         <button type="button" onClick={() => setDeletingEvaluator(evaluator)} aria-label={`Excluir link de ${evaluator.name}`} className="flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-600 transition hover:border-red-400 hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950/40"><Trash2 className="h-4 w-4" /><span className="hidden sm:inline">Excluir</span></button>
                       </div>
                     </li>
@@ -272,8 +275,8 @@ function Admin() {
       </main>
 
       {projectForm && selectedEvent && (
-        <div className="fixed inset-0 z-20 grid place-items-center overflow-y-auto bg-foreground/40 px-4 py-8">
-          <form onSubmit={saveProject} className="w-full max-w-md space-y-4 rounded-2xl bg-card p-6 shadow-soft">
+        <div className="fixed inset-0 z-20 grid place-items-center overflow-y-auto overscroll-contain bg-foreground/40 px-3 py-6 sm:px-4 sm:py-8">
+          <form onSubmit={saveProject} className="w-full max-w-md space-y-4 rounded-2xl bg-card p-5 shadow-soft sm:p-6">
             <div className="flex items-center justify-between"><h2 className="font-display text-lg font-bold">{projectForm.id ? "Editar projeto" : "Novo projeto"}</h2><button type="button" onClick={() => setProjectForm(null)} aria-label="Fechar"><X className="h-5 w-5" /></button></div>
             <p className="text-sm text-muted-foreground">Evento: {selectedEvent.name}</p>
             <label className="block space-y-1 text-sm font-medium">Nome do projeto<input required value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
@@ -294,14 +297,14 @@ function Admin() {
         </div>
       )}
       {deletingEvaluator && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-foreground/50 px-4">
+        <div className="fixed inset-0 z-30 grid place-items-center overflow-y-auto overscroll-contain bg-foreground/50 px-4 py-6">
           <section role="alertdialog" aria-modal="true" aria-labelledby="delete-evaluator-title" className="w-full max-w-md space-y-4 rounded-xl bg-card p-6 shadow-soft">
             <h2 id="delete-evaluator-title" className="font-display text-lg font-bold">Revogar link do avaliador</h2>
             <p className="text-sm text-muted-foreground">Deseja realmente remover este avaliador e invalidar o seu link?</p>
             <p className="text-sm font-semibold">{deletingEvaluator.name}</p>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button type="button" onClick={() => setDeletingEvaluator(null)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar</button>
-              <button type="button" onClick={deleteEvaluator} className="flex items-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground"><Trash2 className="h-4 w-4" /> Revogar link</button>
+              <button type="button" onClick={deleteEvaluator} className="flex items-center justify-center gap-2 rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground"><Trash2 className="h-4 w-4" /> Revogar link</button>
             </div>
           </section>
         </div>

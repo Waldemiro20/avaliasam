@@ -86,7 +86,7 @@ function EventManagement() {
   return (
     <div className={`${darkMode ? "dark" : ""} min-h-screen bg-background text-foreground`}>
       <header className="sticky top-0 z-10 border-b bg-card/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
           <Logo />
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => setDarkMode((enabled) => !enabled)} aria-label={darkMode ? "Ativar tema claro" : "Ativar tema escuro"} aria-pressed={darkMode} className="grid h-9 w-9 place-items-center rounded-lg border text-muted-foreground transition hover:text-foreground">
@@ -152,7 +152,7 @@ function EventManagement() {
       </main>
 
       {showForm && (
-        <div className="fixed inset-0 z-20 grid place-items-center overflow-y-auto bg-foreground/40 px-4 py-8">
+        <div className="fixed inset-0 z-20 grid place-items-center overflow-y-auto overscroll-contain bg-foreground/40 px-3 py-6 sm:px-4 sm:py-8">
           <div className="w-full max-w-3xl space-y-4 rounded-2xl bg-card p-5 shadow-soft sm:p-6">
             <div className="flex items-center justify-between">
               <h2 className="font-display text-xl font-bold">{editingEventId ? "Editar Evento" : "Novo Evento"}</h2>
@@ -170,7 +170,7 @@ function EventManagement() {
       )}
 
       {deletingEvent && (
-        <div className="fixed inset-0 z-30 grid place-items-center bg-foreground/50 px-4">
+        <div className="fixed inset-0 z-30 grid place-items-center overflow-y-auto overscroll-contain bg-foreground/50 px-4 py-6">
           <section role="alertdialog" aria-modal="true" aria-labelledby="delete-event-title" className="w-full max-w-md space-y-4 rounded-2xl bg-card p-6 shadow-2xl">
             <div>
               <h2 id="delete-event-title" className="font-display text-xl font-bold">Excluir evento?</h2>
@@ -178,7 +178,7 @@ function EventManagement() {
                 Excluir <strong className="text-foreground">{deletingEvent.name}</strong> também removerá seus projetos, convites e votos. Esta ação não pode ser desfeita.
               </p>
             </div>
-            <div className="flex justify-end gap-3">
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button type="button" onClick={() => setDeletingEvent(null)} className="rounded-lg border px-4 py-2 text-sm font-semibold">Cancelar</button>
               <button type="button" onClick={deleteEvent} className="rounded-lg bg-destructive px-4 py-2 text-sm font-semibold text-destructive-foreground">Excluir evento</button>
             </div>
