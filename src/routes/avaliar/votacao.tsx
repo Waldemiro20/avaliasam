@@ -4,6 +4,7 @@ import { CheckCircle2, LogOut, Moon, Send, Sun, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Logo } from "@/components/Logo";
 import { MoneyInput } from "@/components/MoneyInput";
+import { openStoredFile, type StoredFile } from "@/lib/files";
 import { clampMoney, evaluateProject, formatBRL, MAX_PER_PROJECT, store, useStore, type ProjectScore } from "@/lib/store";
 
 export const Route = createFileRoute("/avaliar/votacao")({
@@ -109,10 +110,10 @@ function Voting() {
                   <h2 className="font-display text-xl font-bold">{p.name}</h2>
                   <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><Users className="h-4 w-4" /> {p.members}</p>
                   <p className="mt-3 text-sm">{p.description}</p>
-                  {(p.prototypeUrl || p.presentationUrl) && (
+                  {(p.prototypeFile || p.presentationFile || p.prototypeUrl || p.presentationUrl) && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {p.prototypeUrl && <a href={p.prototypeUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-2 text-sm font-semibold transition hover:border-accent hover:text-accent">🎨 Ver Protótipo</a>}
-                      {p.presentationUrl && <a href={p.presentationUrl} target="_blank" rel="noopener noreferrer" className="rounded-lg border px-3 py-2 text-sm font-semibold transition hover:border-accent hover:text-accent">📊 Ver Apresentação</a>}
+                      {p.prototypeFile ? <FileButton file={p.prototypeFile} label="🎨 Ver Protótipo" /> : p.prototypeUrl && <a href={p.prototypeUrl} target="_blank" rel="noopener noreferrer" className={fileButtonClass}>🎨 Ver Protótipo</a>}
+                      {p.presentationFile ? <FileButton file={p.presentationFile} label="📊 Ver Apresentação" /> : p.presentationUrl && <a href={p.presentationUrl} target="_blank" rel="noopener noreferrer" className={fileButtonClass}>📊 Ver Apresentação</a>}
                     </div>
                   )}
                 </div>
@@ -165,5 +166,15 @@ function Voting() {
         </div>
       )}
     </div>
+  );
+}
+
+const fileButtonClass = "rounded-lg border px-3 py-2 text-sm font-semibold transition hover:border-accent hover:text-accent";
+
+function FileButton({ file, label }: { file: StoredFile; label: string }) {
+  return (
+    <button type="button" title={file.name} onClick={() => openStoredFile(file).catch((error) => toast.error(error instanceof Error ? error.message : "Não foi possível abrir o arquivo."))} className={fileButtonClass}>
+      {label}
+    </button>
   );
 }

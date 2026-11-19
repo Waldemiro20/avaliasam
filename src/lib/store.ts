@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { StoredFile } from "./files";
 
 export const MAX_PER_PROJECT = 100_000;
 export const ADMIN_EMAIL = "admin123@gmail.com";
@@ -9,8 +10,11 @@ export type Project = {
   name: string;
   members: string;
   description: string;
+  /** Links antigos (antes do envio de arquivos); mantidos só para exibição. */
   prototypeUrl?: string;
   presentationUrl?: string;
+  prototypeFile?: StoredFile | undefined;
+  presentationFile?: StoredFile | undefined;
 };
 export type Competency = {
   id: string;

@@ -4,6 +4,8 @@ import { Copy, Link2, LogOut, Moon, Pencil, Plus, Sun, Trash2, Trophy, X } from 
 import { toast } from "sonner";
 import { EventForm, type EventFormValues } from "@/components/EventForm";
 import { Logo } from "@/components/Logo";
+import { ProjectFileField } from "@/components/ProjectFileField";
+import { deleteFile, type StoredFile } from "@/lib/files";
 import { computeRanking, evaluateProject, formatBRL, fromCents, store, toCents, useStore, type Evaluator, type Project, type Votes } from "@/lib/store";
 
 export const Route = createFileRoute("/admin/evento/$eventId")({
@@ -18,12 +20,13 @@ export const Route = createFileRoute("/admin/evento/$eventId")({
   component: Admin,
 });
 
-const emptyProject = { name: "", members: "", description: "", prototypeUrl: "", presentationUrl: "" };
+type ProjectForm = { id?: string; name: string; members: string; description: string; prototypeFile?: StoredFile | undefined; presentationFile?: StoredFile | undefined };
+const emptyProject: ProjectForm = { name: "", members: "", description: "" };
 function Admin() {
   const nav = useNavigate();
   const { eventId } = Route.useParams();
   const { ready, isAdmin, events, votes, evaluators, scoreSheets } = useStore();
-  const [projectForm, setProjectForm] = useState<(typeof emptyProject & { id?: string }) | null>(null);
+  const [projectForm, setProjectForm] = useState<ProjectForm | null>(null);
   const [evaluatorName, setEvaluatorName] = useState("");
   const [deletingEvaluator, setDeletingEvaluator] = useState<Evaluator | null>(null);
   const [darkMode, setDarkMode] = useState(false);
@@ -83,16 +86,19 @@ function Admin() {
     e.preventDefault();
     if (!selectedEvent || !projectForm || !projectForm.name.trim()) return;
     const projectDetails = {
-      ...projectForm,
       name: projectForm.name.trim(),
       members: projectForm.members.trim(),
       description: projectForm.description.trim(),
-      prototypeUrl: projectForm.prototypeUrl.trim(),
-      presentationUrl: projectForm.presentationUrl.trim(),
+      prototypeFile: projectForm.prototypeFile,
+      presentationFile: projectForm.presentationFile,
     };
-    const projects: Project[] = projectForm.id
-      ? selectedEvent.projects.map((project) => project.id === projectForm.id ? { ...project, ...projectDetails, id: project.id } : project)
+    const previous = selectedEvent.projects.find((project) => project.id === projectForm.id);
+    const projects: Project[] = previous
+      ? selectedEvent.projects.map((project) => project.id === previous.id ? { ...project, ...projectDetails, id: project.id } : project)
       : [...selectedEvent.projects, { ...projectDetails, id: crypto.randomUUID() }];
+    for (const old of [previous?.prototypeFile, previous?.presentationFile]) {
+      if (old && old.id !== projectDetails.prototypeFile?.id && old.id !== projectDetails.presentationFile?.id) void deleteFile(old.id);
+    }
     store.saveEventProjects(selectedEvent.id, projects);
     toast.success(projectForm.id ? "Projeto atualizado" : "Projeto cadastrado");
     setProjectForm(null);
@@ -101,7 +107,9 @@ function Admin() {
   const removeProject = (id: string) => {
     if (!selectedEvent) return;
     if (confirm("Excluir este projeto?")) {
+      const removed = selectedEvent.projects.find((project) => project.id === id);
       store.saveEventProjects(selectedEvent.id, selectedEvent.projects.filter((project) => project.id !== id));
+      for (const file of [removed?.prototypeFile, removed?.presentationFile]) if (file) void deleteFile(file.id);
     }
   };
 
@@ -226,7 +234,7 @@ function Admin() {
                       <tr key={project.id} className="border-t align-top">
                         <td className="py-3 font-semibold">{project.name}</td><td className="py-3">{project.members}</td><td className="hidden max-w-xs truncate py-3 text-muted-foreground md:table-cell">{project.description}</td>
                         <td className="whitespace-nowrap py-3 text-right">
-                          <button onClick={() => setProjectForm({ ...emptyProject, ...project, prototypeUrl: project.prototypeUrl ?? "", presentationUrl: project.presentationUrl ?? "" })} aria-label={`Editar ${project.name}`} className="p-1.5 text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
+                          <button onClick={() => setProjectForm({ id: project.id, name: project.name, members: project.members, description: project.description, prototypeFile: project.prototypeFile, presentationFile: project.presentationFile })} aria-label={`Editar ${project.name}`} className="p-1.5 text-muted-foreground hover:text-primary"><Pencil className="h-4 w-4" /></button>
                           <button onClick={() => removeProject(project.id)} aria-label={`Excluir ${project.name}`} className="p-1.5 text-muted-foreground hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
                         </td>
                       </tr>
@@ -269,8 +277,8 @@ function Admin() {
             <label className="block space-y-1 text-sm font-medium">Nome do projeto<input required value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
             <label className="block space-y-1 text-sm font-medium">Nomes dos integrantes<input value={projectForm.members} onChange={(e) => setProjectForm({ ...projectForm, members: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
             <label className="block space-y-1 text-sm font-medium">Descrição<textarea rows={4} value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
-            <label className="block space-y-1 text-sm font-medium">Link do Protótipo (opcional)<input type="url" value={projectForm.prototypeUrl ?? ""} onChange={(e) => setProjectForm({ ...projectForm, prototypeUrl: e.target.value })} placeholder="https://..." className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
-            <label className="block space-y-1 text-sm font-medium">Link da Apresentação (opcional)<input type="url" value={projectForm.presentationUrl ?? ""} onChange={(e) => setProjectForm({ ...projectForm, presentationUrl: e.target.value })} placeholder="https://..." className="w-full rounded-lg border bg-background px-3 py-2 outline-none focus:ring-2 focus:ring-ring" /></label>
+            <ProjectFileField label="Arquivo do Protótipo (opcional)" value={projectForm.prototypeFile} onChange={(file) => setProjectForm((form) => form && { ...form, prototypeFile: file })} />
+            <ProjectFileField label="Arquivo da Apresentação / Slides (opcional)" value={projectForm.presentationFile} onChange={(file) => setProjectForm((form) => form && { ...form, presentationFile: file })} />
             <button className="bg-brand w-full rounded-lg py-2.5 font-semibold text-primary-foreground">Salvar projeto</button>
           </form>
         </div>
