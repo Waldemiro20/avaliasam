@@ -112,8 +112,10 @@ function Voting() {
                   <p className="mt-3 text-sm">{p.description}</p>
                   {(p.prototypeFile || p.presentationFile || p.prototypeUrl || p.presentationUrl) && (
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {p.prototypeFile ? <FileButton file={p.prototypeFile} label="🎨 Ver Protótipo" /> : p.prototypeUrl && <a href={p.prototypeUrl} target="_blank" rel="noopener noreferrer" className={fileButtonClass}>🎨 Ver Protótipo</a>}
-                      {p.presentationFile ? <FileButton file={p.presentationFile} label="📊 Ver Apresentação" /> : p.presentationUrl && <a href={p.presentationUrl} target="_blank" rel="noopener noreferrer" className={fileButtonClass}>📊 Ver Apresentação</a>}
+                      {p.prototypeFile && <FileButton file={p.prototypeFile} label={p.prototypeUrl ? "🎨 Protótipo (arquivo)" : "🎨 Ver Protótipo"} />}
+                      {p.prototypeUrl && <a href={p.prototypeUrl} target="_blank" rel="noopener noreferrer" className={fileButtonClass}>{p.prototypeFile ? "🔗 Protótipo (link)" : "🎨 Ver Protótipo"}</a>}
+                      {p.presentationFile && <FileButton file={p.presentationFile} label={p.presentationUrl ? "📊 Apresentação (arquivo)" : "📊 Ver Apresentação"} />}
+                      {p.presentationUrl && <a href={p.presentationUrl} target="_blank" rel="noopener noreferrer" className={fileButtonClass}>{p.presentationFile ? "🔗 Apresentação (link)" : "📊 Ver Apresentação"}</a>}
                     </div>
                   )}
                 </div>

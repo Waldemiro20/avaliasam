@@ -10,7 +10,7 @@ export type Project = {
   name: string;
   members: string;
   description: string;
-  /** Links antigos (antes do envio de arquivos); mantidos só para exibição. */
+  /** Protótipo e apresentação podem ter link, arquivo ou ambos. */
   prototypeUrl?: string;
   presentationUrl?: string;
   prototypeFile?: StoredFile | undefined;
